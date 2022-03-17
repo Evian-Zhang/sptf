@@ -1,3 +1,4 @@
+use crate::messages::*;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use log::info;
@@ -11,18 +12,24 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// User session actor
 pub struct UserSession {
+    /// Unique ID indicating self to session manager
+    id: Option<usize>,
     /// Last heartbeat time
     ///
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise we drop connection.
     heartbeat: Instant,
+    /// Address of session manager
+    manager_address: Addr<crate::manager::SessionManager>,
 }
 
 impl UserSession {
     /// Create a new user session
-    pub fn new() -> Self {
+    pub fn new(manager_address: Addr<crate::manager::SessionManager>) -> Self {
         Self {
+            id: None,
             heartbeat: Instant::now(),
+            manager_address,
         }
     }
 
@@ -54,6 +61,31 @@ impl Actor for UserSession {
     /// Method is called on actor start. We start the heartbeat process here.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.start_beating_heart(ctx);
+
+        // TODO: Add authentication here?
+        let addr = ctx.address();
+        self.manager_address
+            .send(Connect {
+                addr: addr.recipient(),
+            })
+            .into_actor(self)
+            .then(|res, act, ctx| {
+                match res {
+                    Ok(new_id) => act.id = Some(new_id),
+                    // something is wrong with chat server
+                    _ => ctx.stop(),
+                }
+                fut::ready(())
+            })
+            .wait(ctx);
+    }
+
+    fn stopping(&mut self, _: &mut Self::Context) -> Running {
+        if let Some(id) = self.id {
+            // notify chat server
+            self.manager_address.do_send(Disconnect { id });
+        }
+        Running::Stop
     }
 }
 
@@ -66,5 +98,17 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
             Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
             _ => (),
         }
+    }
+}
+
+impl Handler<RefreshFilesMessage> for UserSession {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: RefreshFilesMessage,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) -> Self::Result {
+        unimplemented!()
     }
 }

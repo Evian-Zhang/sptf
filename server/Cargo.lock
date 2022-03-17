@@ -1114,6 +1114,7 @@ dependencies = [
  "log",
  "protobuf",
  "protobuf-codegen-pure",
+ "rand",
  "rustls",
  "rustls-pemfile",
  "serde",

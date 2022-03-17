@@ -18,6 +18,7 @@ toml = "0.5"
 log = "0.4"
 env_logger = "0.8"
 protobuf = { version = "~2", features = ["with-bytes"] }
+rand = "0.8"
 
 [build-dependencies]
 protobuf-codegen-pure = "~2"
