@@ -1,4 +1,7 @@
+// extern crate protobuf;
+
 mod config;
+mod protos;
 mod session;
 
 use actix_web::{middleware::Logger, web, App, Error, HttpRequest, HttpResponse, HttpServer};
@@ -9,7 +12,6 @@ use session::UserSession;
 
 async fn index(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
     let resp = ws::start(UserSession::new(), &req, stream);
-    println!("{:?}", resp);
     resp
 }
 
