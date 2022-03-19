@@ -3,6 +3,7 @@ use actix::prelude::*;
 use actix_web_actors::ws;
 use log::info;
 use std::time::{Duration, Instant};
+use uuid::Uuid;
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -13,7 +14,9 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 /// User session actor
 pub struct UserSession {
     /// Unique ID indicating self to session manager
-    id: Option<usize>,
+    session_id: Option<usize>,
+    /// Unique ID indicating self to user manager
+    user_id: Uuid,
     /// Last heartbeat time
     ///
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
@@ -25,9 +28,10 @@ pub struct UserSession {
 
 impl UserSession {
     /// Create a new user session
-    pub fn new(manager_address: Addr<crate::manager::SessionManager>) -> Self {
+    pub fn new(manager_address: Addr<crate::manager::SessionManager>, user_id: Uuid) -> Self {
         Self {
-            id: None,
+            session_id: None,
+            user_id,
             heartbeat: Instant::now(),
             manager_address,
         }
@@ -71,8 +75,8 @@ impl Actor for UserSession {
             .into_actor(self)
             .then(|res, act, ctx| {
                 match res {
-                    Ok(new_id) => act.id = Some(new_id),
-                    // something is wrong with chat server
+                    Ok(new_id) => act.session_id = Some(new_id),
+                    // something is wrong with session manager
                     _ => ctx.stop(),
                 }
                 fut::ready(())
@@ -81,8 +85,8 @@ impl Actor for UserSession {
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        if let Some(id) = self.id {
-            // notify chat server
+        if let Some(id) = self.session_id {
+            // notify session manager
             self.manager_address.do_send(Disconnect { id });
         }
         Running::Stop

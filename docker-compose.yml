@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  database:
+    image: postgres
+    volumes:
+      - type: volume
+        source: db-data
+        target: /var/lib/postgresql/data
+    environment:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+    ports:
+      - target: 5432
+        published: ${POSTGRES_HOST_PORT}
+
+volumes:
+  db-data:

@@ -11,6 +11,12 @@ struct RawConfig {
     port: u16,
     /// PEM file path
     pem_file_path: String,
+    database_port: u16,
+    database_username: String,
+    database_password: String,
+    redis_port: u16,
+    redis_username: String,
+    redis_password: String,
 }
 
 /// Config file after processing raw config
@@ -21,6 +27,12 @@ pub struct Config {
     pub certificate: Vec<u8>,
     /// Private key
     pub private_key: Vec<u8>,
+    pub database_port: u16,
+    pub database_username: String,
+    pub database_password: String,
+    pub redis_port: u16,
+    pub redis_username: String,
+    pub redis_password: String,
 }
 
 /// Read config at ./config.toml
@@ -30,6 +42,12 @@ pub fn get_config() -> Config {
     let RawConfig {
         port,
         pem_file_path,
+        database_port,
+        database_username,
+        database_password,
+        redis_port,
+        redis_username,
+        redis_password,
     } = toml::from_str::<RawConfig>(&fs::read_to_string("./config.toml").unwrap()).unwrap();
 
     let mut certificate = None;
@@ -51,5 +69,11 @@ pub fn get_config() -> Config {
         port,
         certificate,
         private_key,
+        database_port,
+        database_username,
+        database_password,
+        redis_port,
+        redis_username,
+        redis_password,
     }
 }
