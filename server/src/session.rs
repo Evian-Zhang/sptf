@@ -2,6 +2,7 @@ use crate::messages::*;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use log::info;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
@@ -24,6 +25,8 @@ pub struct UserSession {
     heartbeat: Instant,
     /// Address of session manager
     manager_address: Addr<crate::manager::SessionManager>,
+    /// User watched paths
+    watched_paths: Vec<PathBuf>,
 }
 
 impl UserSession {
@@ -34,6 +37,7 @@ impl UserSession {
             user_id,
             heartbeat: Instant::now(),
             manager_address,
+            watched_paths: vec![],
         }
     }
 
@@ -66,7 +70,6 @@ impl Actor for UserSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         self.start_beating_heart(ctx);
 
-        // TODO: Add authentication here?
         let addr = ctx.address();
         self.manager_address
             .send(Connect {

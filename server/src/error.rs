@@ -5,7 +5,7 @@ pub trait SPTFError {
     fn error_code(&self) -> usize;
 
     fn to_json_string(&self) -> String {
-        serde_json::to_string(json!({
+        serde_json::to_string(&json!({
             "errorCode": self.error_code()
         }))
         .unwrap()
