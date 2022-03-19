@@ -1,7 +1,9 @@
 use crate::messages::*;
+use crate::protos::sptf::BasicIncomingMessage;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use log::info;
+use protobuf::Message;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
@@ -102,7 +104,32 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Text(text)) => ctx.text(text),
-            Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
+            Ok(ws::Message::Binary(bin)) => {
+                let request =
+                    if let Ok(request) = BasicIncomingMessage::parse_from_carllerche_bytes(&bin) {
+                        request
+                    } else {
+                        unimplemented!()
+                    };
+                let message_content = if let Some(message_content) = request.message_content {
+                    message_content
+                } else {
+                    unimplemented!()
+                };
+                use crate::protos::sptf::BasicIncomingMessage_oneof_message_content::*;
+                match message_content {
+                    list_directory_message(list_directory_request) => {
+                        // crate::files::list_dir()
+                    }
+                    download_files_message(download_files_request) => {
+                        unimplemented!()
+                    }
+                    upload_files_message(upload_files_request) => {
+                        unimplemented!()
+                    }
+                }
+                unimplemented!()
+            }
             _ => (),
         }
     }

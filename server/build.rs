@@ -1,6 +1,7 @@
 use protobuf_codegen_pure::{Codegen, Customize};
 
 fn main() {
+    println!("cargo:rerun-if-changed=../protos/");
     Codegen::new()
         .input("../protos/sptf.proto")
         .include("../protos")
@@ -9,7 +10,6 @@ fn main() {
             carllerche_bytes_for_string: Some(true),
             carllerche_bytes_for_bytes: Some(true),
             serde_derive: Some(true),
-            serde_rename_all: Some("camelCase".to_owned()),
             gen_mod_rs: Some(true),
             ..Customize::default()
         })

@@ -2,6 +2,7 @@
 
 mod config;
 mod error;
+mod files;
 mod manager;
 mod messages;
 mod protos;

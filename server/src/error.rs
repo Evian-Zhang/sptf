@@ -63,8 +63,22 @@ impl SPTFError for RedisCacheError {
     }
 }
 
+pub enum FileError {
+    PermissionDenied,
+}
+
+impl SPTFError for FileError {
+    fn error_code(&self) -> usize {
+        use FileError::*;
+        match self {
+            PermissionDenied => FILE_ERROR_PERMISSION_DENIED_ERROR_CODE,
+        }
+    }
+}
+
 const UNEXPECTED_ERROR_CODE: usize = 0x0;
 const VALIDATE_ERROR_NO_USERNAME_ERROR_CODE: usize = 0x1;
 const VALIDATE_ERROR_UNMATCHED_PASSWORD_ERROR_CODE: usize = 0x2;
 const REDIS_CACHE_ERROR_UPDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x3;
 const REDIS_CACHE_ERROR_VALIDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x4;
+const FILE_ERROR_PERMISSION_DENIED_ERROR_CODE: usize = 0x5;

@@ -2,4 +2,58 @@ syntax = "proto2";
 
 package sptf;
 
+message ListDirectoryRequest {
+    required string path = 1;
+}
 
+message DownloadFilesRequest {
+    repeated string paths = 1;
+}
+
+message UploadFilesRequest {
+    repeated string paths = 1;
+}
+
+message BasicIncomingMessage {
+    required int32 version = 1;
+    oneof message_content {
+        ListDirectoryRequest list_directory_message = 2;
+        DownloadFilesRequest download_files_message = 3;
+        UploadFilesRequest upload_files_message = 4;
+    } 
+}
+
+message ErrorResponse {
+    required uint64 error_code = 1;
+}
+
+message ListDirectoryResponse {
+    message FileMetadata {
+        enum FileType {
+            NORMAL_FILE = 0;
+            DIRECTORY = 1;
+        }
+
+        required FileType file_type = 1;
+        required uint64 size = 2;
+        required uint64 modified_timestamp = 3;
+        required uint64 accessed_timestamp = 4;
+        required uint64 created_timestamp = 5;
+    }
+
+    message File {
+        required string path = 1;
+        required string file_name = 2;
+        required FileMetadata metadata = 3;
+    }
+
+    repeated File files = 1;
+}
+
+message BasicOutcomingMessage {
+    required int32 version = 1;
+    oneof message_content {
+        ErrorResponse error = 2;
+        ListDirectoryResponse list_directory_message = 3;
+    }
+}
