@@ -1,10 +1,11 @@
+use crate::error::{ProtobufError, SPTFError};
 use crate::messages::*;
 use crate::protos::sptf::BasicIncomingMessage;
 use actix::prelude::*;
 use actix_web_actors::ws;
-use log::info;
+use log::{info, warn};
 use protobuf::Message;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
@@ -105,21 +106,39 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Text(text)) => ctx.text(text),
             Ok(ws::Message::Binary(bin)) => {
-                let request =
-                    if let Ok(request) = BasicIncomingMessage::parse_from_carllerche_bytes(&bin) {
-                        request
-                    } else {
-                        unimplemented!()
-                    };
+                let request = match BasicIncomingMessage::parse_from_carllerche_bytes(&bin) {
+                    Ok(request) => request,
+                    Err(err) => {
+                        warn!("Error parsing income message: {}", err);
+                        let error = ProtobufError::WrongFormat;
+                        ctx.binary(error.to_proto_binary());
+                        return;
+                    }
+                };
                 let message_content = if let Some(message_content) = request.message_content {
                     message_content
                 } else {
-                    unimplemented!()
+                    warn!("Incoming message has none message_content field");
+                    let error = ProtobufError::WrongFormat;
+                    ctx.binary(error.to_proto_binary());
+                    return;
                 };
                 use crate::protos::sptf::BasicIncomingMessage_oneof_message_content::*;
                 match message_content {
                     list_directory_message(list_directory_request) => {
-                        // crate::files::list_dir()
+                        match crate::files::list_dir(&Path::new(list_directory_request.get_path()))
+                        {
+                            Ok(response) => {
+                                ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
+                                    warn!("Failed to write to bytes: {}", err);
+                                    vec![]
+                                }));
+                            }
+                            Err(err) => {
+                                ctx.binary(err.to_proto_binary());
+                                return;
+                            }
+                        }
                     }
                     download_files_message(download_files_request) => {
                         unimplemented!()
@@ -128,7 +147,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
                         unimplemented!()
                     }
                 }
-                unimplemented!()
             }
             _ => (),
         }

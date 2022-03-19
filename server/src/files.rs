@@ -1,16 +1,16 @@
 use crate::error::{FileError, SPTFError, UnexpectedError};
 use crate::protos::sptf::{
-    ListDirectoryResponse_File, ListDirectoryResponse_FileMetadata,
+    ListDirectoryResponse, ListDirectoryResponse_File, ListDirectoryResponse_FileMetadata,
     ListDirectoryResponse_FileMetadata_FileType,
 };
 use log::{error, warn};
+use std::fs;
 use std::io;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::fs;
 
-pub async fn list_dir(path: &Path) -> Result<Vec<ListDirectoryResponse_File>, Box<dyn SPTFError>> {
-    let read_dir_result = fs::read_dir(path).await;
+pub fn list_dir(path: &Path) -> Result<ListDirectoryResponse, Box<dyn SPTFError>> {
+    let read_dir_result = fs::read_dir(path);
     let mut read_dir_iter = match read_dir_result {
         Ok(read_dir_iter) => read_dir_iter,
         Err(err) => {
@@ -20,17 +20,17 @@ pub async fn list_dir(path: &Path) -> Result<Vec<ListDirectoryResponse_File>, Bo
     };
     let mut entries = vec![];
     loop {
-        let dir_entry = match read_dir_iter.next_entry().await {
-            Ok(Some(dir_entry)) => dir_entry,
-            Ok(None) => {
+        let dir_entry = match read_dir_iter.next() {
+            Some(Ok(dir_entry)) => dir_entry,
+            None => {
                 break;
             }
-            Err(err) => {
+            Some(Err(err)) => {
                 error!("Unexpected error when listing dir {:?}: {}", path, err);
                 break;
             }
         };
-        let dir_entry_file_type = match dir_entry.file_type().await {
+        let dir_entry_file_type = match dir_entry.file_type() {
             Ok(file_type) => file_type,
             Err(err) => {
                 error!(
@@ -52,7 +52,7 @@ pub async fn list_dir(path: &Path) -> Result<Vec<ListDirectoryResponse_File>, Bo
             );
             continue;
         };
-        let dir_entry_metadata = match dir_entry.metadata().await {
+        let dir_entry_metadata = match dir_entry.metadata() {
             Ok(metadata) => metadata,
             Err(err) => {
                 error!(
@@ -112,9 +112,12 @@ pub async fn list_dir(path: &Path) -> Result<Vec<ListDirectoryResponse_File>, Bo
         entry.set_path(file_path_string.into());
         entry.set_file_name(file_name.into());
         entry.set_metadata(metadata);
+        entries.push(entry);
     }
 
-    Ok(entries)
+    let mut list_dir_response = ListDirectoryResponse::default();
+    list_dir_response.set_files(entries.into());
+    Ok(list_dir_response)
 }
 
 fn retrieve_timestamp(

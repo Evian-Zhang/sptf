@@ -1,4 +1,7 @@
+use crate::protos::sptf::ErrorResponse;
 use actix_web::{http::header::ContentType, HttpResponse};
+use log::error;
+use protobuf::Message;
 use serde_json::json;
 
 pub trait SPTFError {
@@ -22,6 +25,20 @@ pub trait SPTFError {
         HttpResponse::Ok()
             .content_type(ContentType::json())
             .body(self.to_json_string())
+    }
+
+    fn to_proto_error(&self) -> ErrorResponse {
+        let mut error_response = ErrorResponse::default();
+        error_response.set_error_code(self.error_code() as u64);
+        error_response
+    }
+
+    fn to_proto_binary(&self) -> Vec<u8> {
+        let error_response = self.to_proto_error();
+        error_response.write_to_bytes().unwrap_or_else(|err| {
+            error!("Failed to write error to binary: {}", err);
+            vec![]
+        })
     }
 }
 
@@ -76,9 +93,23 @@ impl SPTFError for FileError {
     }
 }
 
+pub enum ProtobufError {
+    WrongFormat,
+}
+
+impl SPTFError for ProtobufError {
+    fn error_code(&self) -> usize {
+        use ProtobufError::*;
+        match self {
+            WrongFormat => PROTOBUF_ERROR_WRONG_FORMAT_ERROR_CODE,
+        }
+    }
+}
+
 const UNEXPECTED_ERROR_CODE: usize = 0x0;
 const VALIDATE_ERROR_NO_USERNAME_ERROR_CODE: usize = 0x1;
 const VALIDATE_ERROR_UNMATCHED_PASSWORD_ERROR_CODE: usize = 0x2;
 const REDIS_CACHE_ERROR_UPDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x3;
 const REDIS_CACHE_ERROR_VALIDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x4;
 const FILE_ERROR_PERMISSION_DENIED_ERROR_CODE: usize = 0x5;
+const PROTOBUF_ERROR_WRONG_FORMAT_ERROR_CODE: usize = 0x6;
