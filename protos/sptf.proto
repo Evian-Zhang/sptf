@@ -56,3 +56,12 @@ message BasicOutcomingMessage {
         ErrorResponse GeneralError = 3;
     }
 }
+
+message FileUploadRequest {
+    message UploadedFile {
+        required string file_name = 1;
+        required bytes content = 2;
+    }
+    required string dir_path = 1;
+    repeated UploadedFile uploaded_file = 2;
+}

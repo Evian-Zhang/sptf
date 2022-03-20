@@ -18,7 +18,7 @@ use actix_web::{
     http::header::ContentType,
     middleware::Logger,
     post,
-    web::{self, Json},
+    web::{self, Json, PayloadConfig},
     App, Error, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
@@ -32,6 +32,8 @@ use filewatcher::FileWatcherActor;
 use log::error;
 use manager::SessionManager;
 use notify::{RecursiveMode, Watcher};
+use protobuf::Message;
+use protos::sptf::FileUploadRequest;
 use redis::{
     ConnectionAddr as RedisConnectionAddr, ConnectionInfo as RedisConnectionTotalInfo,
     RedisConnectionInfo,
@@ -138,6 +140,22 @@ async fn download_files(req: HttpRequest, query: web::Query<DownloadFilesQuery>)
             },
             Err(err) => err.to_http_response(),
         },
+    }
+}
+
+#[post("/upload")]
+async fn upload_files(body: web::Bytes) -> HttpResponse {
+    let file_upload_request = match FileUploadRequest::parse_from_carllerche_bytes(&body) {
+        Ok(file_upload_request) => file_upload_request,
+        Err(err) => {
+            error!("Failed to parse file upload request: {}", err);
+            return UnexpectedError.to_http_response();
+        }
+    };
+    if let Err(err) = files::upload_files(file_upload_request).await {
+        err.to_http_response()
+    } else {
+        HttpResponse::Ok().finish()
     }
 }
 
@@ -252,8 +270,10 @@ async fn main() -> std::io::Result<()> {
                 database_connection_pool: postgres_pool.clone(),
                 redis_connection_pool: redis_pool.clone(),
             }))
+            .app_data(PayloadConfig::default().limit(common::MAX_FILE_UPLOAD_SIZE))
             .service(index)
             .service(download_files)
+            .service(upload_files)
             .wrap(Logger::default())
     })
     .bind_rustls(("0.0.0.0", config.port), rustls_server_config)?

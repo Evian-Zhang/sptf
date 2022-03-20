@@ -1625,6 +1625,7 @@ dependencies = [
  "actix-tls",
  "actix-web",
  "actix-web-actors",
+ "bytes",
  "deadpool",
  "deadpool-postgres",
  "deadpool-redis",

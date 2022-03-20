@@ -1,7 +1,7 @@
 use crate::error::{FileError, SPTFError, UnexpectedError};
 use crate::protos::sptf::{
     DirectoryLayout, DirectoryLayout_File, DirectoryLayout_FileMetadata,
-    DirectoryLayout_FileMetadata_FileType, ListDirectoryResponse,
+    DirectoryLayout_FileMetadata_FileType, FileUploadRequest, ListDirectoryResponse,
 };
 use flate2::{write::GzEncoder, Compression};
 use log::{error, warn};
@@ -185,4 +185,24 @@ pub async fn compress_files(files: &Vec<String>) -> Result<File, Box<dyn SPTFErr
     drop(tar);
 
     Ok(temp_compressed_file)
+}
+
+pub async fn upload_files(
+    file_upload_request: FileUploadRequest,
+) -> Result<(), Box<dyn SPTFError>> {
+    let dir_path = file_upload_request.get_dir_path();
+    let mut result = Ok(());
+    for file in file_upload_request.get_uploaded_file() {
+        let file_name = file.get_file_name();
+        let mut file_path = PathBuf::from(&dir_path);
+        file_path.push(file_name);
+        let content = file.get_content();
+        if let Err(err) = tokio::fs::write(&file_path, content).await {
+            error!("Failed to write to {:?}: {}", file_path, err);
+            result = Err(FileError::PermissionDenied.to_boxed_self());
+            continue;
+        }
+    }
+
+    result
 }
