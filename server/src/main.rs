@@ -27,9 +27,9 @@ use deadpool_postgres::{
 };
 use deadpool_redis::{Config as DeadpoolRedisConfig, Runtime as DeadpoolRedisRuntime};
 use env_logger::Env;
-use error::{FileError, SPTFError, UnexpectedError};
+use error::{FileError, SPTFError, UnexpectedError, ValidateError};
 use filewatcher::FileWatcherActor;
-use log::error;
+use log::{error, info};
 use manager::SessionManager;
 use notify::{RecursiveMode, Watcher};
 use protobuf::Message;
@@ -43,6 +43,7 @@ use serde::{Deserialize, Serialize};
 use session::UserSession;
 use std::sync::mpsc;
 use tokio_postgres::{Config as PostgresConfig, NoTls};
+use uuid::Uuid;
 
 /// Shared app data
 struct AppData {
@@ -114,13 +115,83 @@ async fn login(login_request: Json<LoginRequest>, app_data: web::Data<AppData>) 
     )
 }
 
+async fn validate_cookie(
+    req: &HttpRequest,
+    app_data: &web::Data<AppData>,
+) -> Result<(String, Uuid), Box<dyn SPTFError>> {
+    let cookie = if let Some(cookie) = req.cookie(common::COOKIE_AUTH_TOKEN_NAME) {
+        cookie
+    } else {
+        return Err(ValidateError::WrongCookie.to_boxed_self());
+    };
+    let redis_connection_fut1 = async {
+        app_data.redis_connection_pool.get().await.map_err(|err| {
+            error!(
+                "Failed to get a connection from redis connection pool: {}",
+                err
+            );
+            UnexpectedError.to_boxed_self()
+        })
+    };
+    let redis_connection_fut2 = async {
+        app_data.redis_connection_pool.get().await.map_err(|err| {
+            error!(
+                "Failed to get a connection from redis connection pool: {}",
+                err
+            );
+            UnexpectedError.to_boxed_self()
+        })
+    };
+    let user_id =
+        user::validate_auth_token(redis_connection_fut1, redis_connection_fut2, cookie.value())
+            .await?;
+    info!("User with id {} succesfully validated", user_id);
+    Ok((cookie.value().to_owned(), user_id))
+}
+
+#[post("/logout")]
+async fn logout(req: HttpRequest, app_data: web::Data<AppData>) -> HttpResponse {
+    let (auth_token, _) = match validate_cookie(&req, &app_data).await {
+        Ok((auth_token, user_id)) => (auth_token, user_id),
+        Err(err) => {
+            return err.to_http_response();
+        }
+    };
+    let redis_connection_fut = async {
+        app_data.redis_connection_pool.get().await.map_err(|err| {
+            error!(
+                "Failed to get a connection from redis connection pool: {}",
+                err
+            );
+            UnexpectedError.to_boxed_self()
+        })
+    };
+    let _ = user::logout(redis_connection_fut, &auth_token).await;
+    HttpResponse::Ok().finish()
+}
+
+#[post("/login_with_cookie")]
+async fn login_with_cookie(req: HttpRequest, app_data: web::Data<AppData>) -> HttpResponse {
+    if let Err(err) = validate_cookie(&req, &app_data).await {
+        return err.to_http_response();
+    }
+    HttpResponse::Ok().finish()
+}
+
 #[derive(Deserialize)]
 struct DownloadFilesQuery {
     paths: Vec<String>,
 }
 
 #[get("/download")]
-async fn download_files(req: HttpRequest, query: web::Query<DownloadFilesQuery>) -> HttpResponse {
+async fn download_files(
+    req: HttpRequest,
+    query: web::Query<DownloadFilesQuery>,
+    app_data: web::Data<AppData>,
+) -> HttpResponse {
+    if let Err(err) = validate_cookie(&req, &app_data).await {
+        return err.to_http_response();
+    }
     match &query.paths[..] {
         [] => UnexpectedError.to_http_response(),
         [path] => match NamedFile::open(path) {
@@ -144,7 +215,14 @@ async fn download_files(req: HttpRequest, query: web::Query<DownloadFilesQuery>)
 }
 
 #[post("/upload")]
-async fn upload_files(body: web::Bytes) -> HttpResponse {
+async fn upload_files(
+    req: HttpRequest,
+    body: web::Bytes,
+    app_data: web::Data<AppData>,
+) -> HttpResponse {
+    if let Err(err) = validate_cookie(&req, &app_data).await {
+        return err.to_http_response();
+    }
     let file_upload_request = match FileUploadRequest::parse_from_carllerche_bytes(&body) {
         Ok(file_upload_request) => file_upload_request,
         Err(err) => {
@@ -172,7 +250,7 @@ async fn index(
     query: web::Query<WebsocketEstablishRequestQuery>,
 ) -> Result<HttpResponse, Error> {
     let auth_token_string = &query.auth_token;
-    let redis_connection_fut = async {
+    let redis_connection_fut1 = async {
         app_data.redis_connection_pool.get().await.map_err(|err| {
             error!(
                 "Failed to get a connection from redis connection pool: {}",
@@ -181,8 +259,21 @@ async fn index(
             UnexpectedError.to_boxed_self()
         })
     };
-    let auth_token_validate_result =
-        user::validate_auth_token(redis_connection_fut, auth_token_string).await;
+    let redis_connection_fut2 = async {
+        app_data.redis_connection_pool.get().await.map_err(|err| {
+            error!(
+                "Failed to get a connection from redis connection pool: {}",
+                err
+            );
+            UnexpectedError.to_boxed_self()
+        })
+    };
+    let auth_token_validate_result = user::validate_auth_token(
+        redis_connection_fut1,
+        redis_connection_fut2,
+        auth_token_string,
+    )
+    .await;
     let user_id = match auth_token_validate_result {
         Ok(user_id) => user_id,
         Err(error) => {
@@ -272,6 +363,9 @@ async fn main() -> std::io::Result<()> {
             }))
             .app_data(PayloadConfig::default().limit(common::MAX_FILE_UPLOAD_SIZE))
             .service(index)
+            .service(login)
+            .service(login_with_cookie)
+            .service(logout)
             .service(download_files)
             .service(upload_files)
             .wrap(Logger::default())

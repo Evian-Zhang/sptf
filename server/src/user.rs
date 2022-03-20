@@ -6,9 +6,6 @@ use sha2::{Digest, Sha256};
 use std::future::Future;
 use uuid::Uuid;
 
-/// Redis cache expires in 15 mins
-const REDIS_CACHE_EXPIRATION_IN_SECONDS: usize = 15 * 60;
-
 /// Validate use given the username and password.
 ///
 /// Return a random-generated UUID as auth-token
@@ -90,7 +87,7 @@ async fn update_user_cache<R: Future<Output = Result<RedisConnection, Box<dyn SP
     redis::Cmd::set_ex(
         auth_token.to_string(),
         user_uuid.to_string(),
-        REDIS_CACHE_EXPIRATION_IN_SECONDS,
+        crate::common::REDIS_CACHE_EXPIRATION_IN_SECONDS,
     )
     .query_async::<_, ()>(&mut connection.await?)
     .await
@@ -110,9 +107,11 @@ async fn update_user_cache<R: Future<Output = Result<RedisConnection, Box<dyn SP
 ///
 /// Return user-id
 pub async fn validate_auth_token<
-    R: Future<Output = Result<RedisConnection, Box<dyn SPTFError>>>,
+    R1: Future<Output = Result<RedisConnection, Box<dyn SPTFError>>>,
+    R2: Future<Output = Result<RedisConnection, Box<dyn SPTFError>>>,
 >(
-    connection: R,
+    connection1: R1,
+    connection2: R2,
     auth_token_str: &str,
 ) -> Result<Uuid, Box<dyn SPTFError>> {
     let auth_token = Uuid::parse_str(&auth_token_str).map_err(|err| {
@@ -120,13 +119,12 @@ pub async fn validate_auth_token<
         RedisCacheError::ValidateAuthTokenFailed.to_boxed_self()
     })?;
     let user_id_string = redis::Cmd::get(auth_token.to_string())
-        .query_async::<_, String>(&mut connection.await?)
+        .query_async::<_, String>(&mut connection1.await?)
         .await
         .map_err(|err| {
             error!(
                 "Get user uuid of auth token {} failed: {}",
-                auth_token.to_string(),
-                err
+                auth_token_str, err
             );
             RedisCacheError::ValidateAuthTokenFailed.to_boxed_self()
         })?;
@@ -134,6 +132,21 @@ pub async fn validate_auth_token<
         error!("Parse stored user uuid {} failed: {}", user_id_string, err);
         RedisCacheError::ValidateAuthTokenFailed.to_boxed_self()
     })?;
+    update_user_cache(connection2, user_id, auth_token).await?;
 
     Ok(user_id)
+}
+
+pub async fn logout<R: Future<Output = Result<RedisConnection, Box<dyn SPTFError>>>>(
+    connection: R,
+    auth_token_str: &str,
+) -> Result<(), Box<dyn SPTFError>> {
+    redis::Cmd::del(auth_token_str)
+        .query_async::<_, ()>(&mut connection.await?)
+        .await
+        .map_err(|err| {
+            error!("Failed to del auth token {}: {}", auth_token_str, err);
+            UnexpectedError.to_boxed_self()
+        })?;
+    Ok(())
 }

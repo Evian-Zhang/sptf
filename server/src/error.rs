@@ -53,6 +53,7 @@ impl SPTFError for UnexpectedError {
 pub enum ValidateError {
     NoUsername,
     UnmatchedPassword,
+    WrongCookie,
 }
 
 impl SPTFError for ValidateError {
@@ -61,6 +62,7 @@ impl SPTFError for ValidateError {
         match self {
             NoUsername => VALIDATE_ERROR_NO_USERNAME_ERROR_CODE,
             UnmatchedPassword => VALIDATE_ERROR_UNMATCHED_PASSWORD_ERROR_CODE,
+            WrongCookie => VALIDATE_ERROR_WRONG_COOKIE_ERROR_CODE,
         }
     }
 }
@@ -109,7 +111,8 @@ impl SPTFError for ProtobufError {
 const UNEXPECTED_ERROR_CODE: usize = 0x0;
 const VALIDATE_ERROR_NO_USERNAME_ERROR_CODE: usize = 0x1;
 const VALIDATE_ERROR_UNMATCHED_PASSWORD_ERROR_CODE: usize = 0x2;
-const REDIS_CACHE_ERROR_UPDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x3;
-const REDIS_CACHE_ERROR_VALIDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x4;
-const FILE_ERROR_PERMISSION_DENIED_ERROR_CODE: usize = 0x5;
-const PROTOBUF_ERROR_WRONG_FORMAT_ERROR_CODE: usize = 0x6;
+const VALIDATE_ERROR_WRONG_COOKIE_ERROR_CODE: usize = 0x3;
+const REDIS_CACHE_ERROR_UPDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x4;
+const REDIS_CACHE_ERROR_VALIDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x5;
+const FILE_ERROR_PERMISSION_DENIED_ERROR_CODE: usize = 0x6;
+const PROTOBUF_ERROR_WRONG_FORMAT_ERROR_CODE: usize = 0x7;
