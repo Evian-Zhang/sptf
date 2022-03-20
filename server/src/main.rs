@@ -1,5 +1,3 @@
-// extern crate protobuf;
-
 mod common;
 mod config;
 mod error;
@@ -23,9 +21,12 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use deadpool_postgres::{
-    Manager as DeadpoolPostgresManager, ManagerConfig as DeadpoolPostgresManagerConfig, Pool,
+    Client as PostgresClient, Manager as DeadpoolPostgresManager,
+    ManagerConfig as DeadpoolPostgresManagerConfig, Pool,
 };
-use deadpool_redis::{Config as DeadpoolRedisConfig, Runtime as DeadpoolRedisRuntime};
+use deadpool_redis::{
+    Config as DeadpoolRedisConfig, Connection as RedisConnection, Runtime as DeadpoolRedisRuntime,
+};
 use env_logger::Env;
 use error::{FileError, SPTFError, UnexpectedError, ValidateError};
 use filewatcher::FileWatcherActor;
@@ -66,42 +67,44 @@ struct LoginRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LoginResponse {
-    uuid: String,
+    auth_token: String,
 }
 
-#[post("/login")]
-async fn login(login_request: Json<LoginRequest>, app_data: web::Data<AppData>) -> HttpResponse {
-    let postgres_client_fut = async {
-        app_data
-            .database_connection_pool
-            .get()
-            .await
-            .map_err(|err| {
-                error!(
-                    "Failed to get a connection from postgres connection pool: {}",
-                    err
-                );
-                UnexpectedError.to_boxed_self()
-            })
-    };
-    let redis_connection_fut = async {
-        app_data.redis_connection_pool.get().await.map_err(|err| {
+async fn postgres_client_fut(app_data: &AppData) -> Result<PostgresClient, Box<dyn SPTFError>> {
+    app_data
+        .database_connection_pool
+        .get()
+        .await
+        .map_err(|err| {
             error!(
-                "Failed to get a connection from redis connection pool: {}",
+                "Failed to get a connection from postgres connection pool: {}",
                 err
             );
             UnexpectedError.to_boxed_self()
         })
-    };
+}
+
+async fn redis_connection_fut(app_data: &AppData) -> Result<RedisConnection, Box<dyn SPTFError>> {
+    app_data.redis_connection_pool.get().await.map_err(|err| {
+        error!(
+            "Failed to get a connection from redis connection pool: {}",
+            err
+        );
+        UnexpectedError.to_boxed_self()
+    })
+}
+
+#[post("/login")]
+async fn login(login_request: Json<LoginRequest>, app_data: web::Data<AppData>) -> HttpResponse {
     let validate_result = user::validate_user(
-        postgres_client_fut,
-        redis_connection_fut,
+        postgres_client_fut(&app_data),
+        redis_connection_fut(&app_data),
         &login_request.username,
         &login_request.password,
     )
     .await;
-    let uuid = match validate_result {
-        Ok(uuid) => uuid,
+    let auth_token = match validate_result {
+        Ok(auth_token) => auth_token,
         Err(error) => {
             return error.to_http_response();
         }
@@ -109,10 +112,32 @@ async fn login(login_request: Json<LoginRequest>, app_data: web::Data<AppData>) 
 
     HttpResponse::Ok().content_type(ContentType::json()).body(
         serde_json::to_string(&LoginResponse {
-            uuid: uuid.to_string(),
+            auth_token: auth_token.to_string(),
         })
         .unwrap(),
     )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SignupRequest {
+    username: String,
+    password: String,
+}
+
+#[post("/signup")]
+async fn signup(signup_request: Json<SignupRequest>, app_data: web::Data<AppData>) -> HttpResponse {
+    if let Err(err) = user::signup_user(
+        postgres_client_fut(&app_data),
+        postgres_client_fut(&app_data),
+        &signup_request.username,
+        &signup_request.password,
+    )
+    .await
+    {
+        return err.to_http_response();
+    }
+    HttpResponse::Ok().finish()
 }
 
 async fn validate_cookie(
@@ -124,27 +149,12 @@ async fn validate_cookie(
     } else {
         return Err(ValidateError::WrongCookie.to_boxed_self());
     };
-    let redis_connection_fut1 = async {
-        app_data.redis_connection_pool.get().await.map_err(|err| {
-            error!(
-                "Failed to get a connection from redis connection pool: {}",
-                err
-            );
-            UnexpectedError.to_boxed_self()
-        })
-    };
-    let redis_connection_fut2 = async {
-        app_data.redis_connection_pool.get().await.map_err(|err| {
-            error!(
-                "Failed to get a connection from redis connection pool: {}",
-                err
-            );
-            UnexpectedError.to_boxed_self()
-        })
-    };
-    let user_id =
-        user::validate_auth_token(redis_connection_fut1, redis_connection_fut2, cookie.value())
-            .await?;
+    let user_id = user::validate_auth_token(
+        redis_connection_fut(&app_data),
+        redis_connection_fut(&app_data),
+        cookie.value(),
+    )
+    .await?;
     info!("User with id {} succesfully validated", user_id);
     Ok((cookie.value().to_owned(), user_id))
 }
@@ -250,27 +260,9 @@ async fn index(
     query: web::Query<WebsocketEstablishRequestQuery>,
 ) -> Result<HttpResponse, Error> {
     let auth_token_string = &query.auth_token;
-    let redis_connection_fut1 = async {
-        app_data.redis_connection_pool.get().await.map_err(|err| {
-            error!(
-                "Failed to get a connection from redis connection pool: {}",
-                err
-            );
-            UnexpectedError.to_boxed_self()
-        })
-    };
-    let redis_connection_fut2 = async {
-        app_data.redis_connection_pool.get().await.map_err(|err| {
-            error!(
-                "Failed to get a connection from redis connection pool: {}",
-                err
-            );
-            UnexpectedError.to_boxed_self()
-        })
-    };
     let auth_token_validate_result = user::validate_auth_token(
-        redis_connection_fut1,
-        redis_connection_fut2,
+        redis_connection_fut(&app_data),
+        redis_connection_fut(&app_data),
         auth_token_string,
     )
     .await;

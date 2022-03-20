@@ -108,6 +108,19 @@ impl SPTFError for ProtobufError {
     }
 }
 
+pub enum SignupError {
+    UsernameExist,
+}
+
+impl SPTFError for SignupError {
+    fn error_code(&self) -> usize {
+        use SignupError::*;
+        match self {
+            UsernameExist => SIGNUP_ERROR_USER_NAME_EXIST_ERROR_CODE,
+        }
+    }
+}
+
 const UNEXPECTED_ERROR_CODE: usize = 0x0;
 const VALIDATE_ERROR_NO_USERNAME_ERROR_CODE: usize = 0x1;
 const VALIDATE_ERROR_UNMATCHED_PASSWORD_ERROR_CODE: usize = 0x2;
@@ -116,3 +129,4 @@ const REDIS_CACHE_ERROR_UPDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x4;
 const REDIS_CACHE_ERROR_VALIDATE_AUTH_TOKEN_FAILED_ERROR_CODE: usize = 0x5;
 const FILE_ERROR_PERMISSION_DENIED_ERROR_CODE: usize = 0x6;
 const PROTOBUF_ERROR_WRONG_FORMAT_ERROR_CODE: usize = 0x7;
+const SIGNUP_ERROR_USER_NAME_EXIST_ERROR_CODE: usize = 0x8;
