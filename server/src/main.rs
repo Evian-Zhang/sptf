@@ -1,5 +1,6 @@
 // extern crate protobuf;
 
+mod common;
 mod config;
 mod error;
 mod files;

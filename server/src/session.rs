@@ -1,6 +1,6 @@
 use crate::error::{ProtobufError, SPTFError};
 use crate::messages::*;
-use crate::protos::sptf::BasicIncomingMessage;
+use crate::protos::sptf::{BasicIncomingMessage, BasicOutcomingMessage};
 use actix::prelude::*;
 use actix_web_actors::ws;
 use log::{info, warn};
@@ -29,7 +29,7 @@ pub struct UserSession {
     /// Address of session manager
     manager_address: Addr<crate::manager::SessionManager>,
     /// User watched paths
-    watched_paths: Vec<PathBuf>,
+    watched_path: Option<PathBuf>,
 }
 
 impl UserSession {
@@ -40,7 +40,7 @@ impl UserSession {
             user_id,
             heartbeat: Instant::now(),
             manager_address,
-            watched_paths: vec![],
+            watched_path: None,
         }
     }
 
@@ -104,14 +104,19 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-            Ok(ws::Message::Text(text)) => ctx.text(text),
             Ok(ws::Message::Binary(bin)) => {
+                let mut response = BasicOutcomingMessage::default();
+                response.set_version(crate::common::PROTOCOL_VERSION);
                 let request = match BasicIncomingMessage::parse_from_carllerche_bytes(&bin) {
                     Ok(request) => request,
                     Err(err) => {
                         warn!("Error parsing income message: {}", err);
                         let error = ProtobufError::WrongFormat;
-                        ctx.binary(error.to_proto_binary());
+                        response.set_GeneralError(error.to_proto_error());
+                        ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
+                            warn!("Failed to write to bytes: {}", err);
+                            vec![]
+                        }));
                         return;
                     }
                 };
@@ -120,31 +125,23 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
                 } else {
                     warn!("Incoming message has none message_content field");
                     let error = ProtobufError::WrongFormat;
-                    ctx.binary(error.to_proto_binary());
+                    response.set_GeneralError(error.to_proto_error());
+                    ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
+                        warn!("Failed to write to bytes: {}", err);
+                        vec![]
+                    }));
                     return;
                 };
                 use crate::protos::sptf::BasicIncomingMessage_oneof_message_content::*;
                 match message_content {
-                    list_directory_message(list_directory_request) => {
-                        match crate::files::list_dir(&Path::new(list_directory_request.get_path()))
-                        {
-                            Ok(response) => {
-                                ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
-                                    warn!("Failed to write to bytes: {}", err);
-                                    vec![]
-                                }));
-                            }
-                            Err(err) => {
-                                ctx.binary(err.to_proto_binary());
-                                return;
-                            }
-                        }
-                    }
-                    download_files_message(download_files_request) => {
-                        unimplemented!()
-                    }
-                    upload_files_message(upload_files_request) => {
-                        unimplemented!()
+                    ListDirectoryMessage(list_directory_request) => {
+                        let list_directory_response =
+                            crate::files::list_dir(&Path::new(list_directory_request.get_path()));
+                        response.set_ListDirectoryResponse(list_directory_response);
+                        ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
+                            warn!("Failed to write to bytes: {}", err);
+                            vec![]
+                        }));
                     }
                 }
             }

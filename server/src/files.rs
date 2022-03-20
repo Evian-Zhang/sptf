@@ -1,7 +1,7 @@
 use crate::error::{FileError, SPTFError, UnexpectedError};
 use crate::protos::sptf::{
-    ListDirectoryResponse, ListDirectoryResponse_File, ListDirectoryResponse_FileMetadata,
-    ListDirectoryResponse_FileMetadata_FileType,
+    DirectoryLayout, DirectoryLayout_File, DirectoryLayout_FileMetadata,
+    DirectoryLayout_FileMetadata_FileType, ListDirectoryResponse,
 };
 use log::{error, warn};
 use std::fs;
@@ -9,7 +9,23 @@ use std::io;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn list_dir(path: &Path) -> Result<ListDirectoryResponse, Box<dyn SPTFError>> {
+pub fn list_dir(path: &Path) -> ListDirectoryResponse {
+    let mut list_directory_response = ListDirectoryResponse::default();
+
+    list_directory_response.set_directory_path((*path.to_string_lossy()).into());
+    match list_dir_internal(path) {
+        Ok(directory_layout) => {
+            list_directory_response.set_DirectoryLayout(directory_layout);
+        }
+        Err(error) => {
+            list_directory_response.set_ErrorResponse(error.to_proto_error());
+        }
+    }
+
+    list_directory_response
+}
+
+fn list_dir_internal(path: &Path) -> Result<DirectoryLayout, Box<dyn SPTFError>> {
     let read_dir_result = fs::read_dir(path);
     let mut read_dir_iter = match read_dir_result {
         Ok(read_dir_iter) => read_dir_iter,
@@ -42,9 +58,9 @@ pub fn list_dir(path: &Path) -> Result<ListDirectoryResponse, Box<dyn SPTFError>
             }
         };
         let file_type = if dir_entry_file_type.is_dir() {
-            ListDirectoryResponse_FileMetadata_FileType::DIRECTORY
+            DirectoryLayout_FileMetadata_FileType::DIRECTORY
         } else if dir_entry_file_type.is_file() {
-            ListDirectoryResponse_FileMetadata_FileType::NORMAL_FILE
+            DirectoryLayout_FileMetadata_FileType::NORMAL_FILE
         } else {
             warn!(
                 "File {:?} is not dir or file, so continue.",
@@ -63,7 +79,7 @@ pub fn list_dir(path: &Path) -> Result<ListDirectoryResponse, Box<dyn SPTFError>
                 continue;
             }
         };
-        let mut metadata = ListDirectoryResponse_FileMetadata::default();
+        let mut metadata = DirectoryLayout_FileMetadata::default();
         metadata.set_file_type(file_type);
         metadata.set_size(dir_entry_metadata.len());
         let modified_timestamp =
@@ -87,37 +103,19 @@ pub fn list_dir(path: &Path) -> Result<ListDirectoryResponse, Box<dyn SPTFError>
         metadata.set_modified_timestamp(modified_timestamp);
         metadata.set_accessed_timestamp(accessed_timestamp);
         metadata.set_created_timestamp(created_timestamp);
-        let mut entry = ListDirectoryResponse_File::default();
-        let file_name = dir_entry.file_name();
-        let file_name = if let Some(file_name) = file_name.to_str() {
-            file_name.to_owned()
-        } else {
-            error!(
-                "Unexpected error when converting filename {:?} to string.",
-                dir_entry.file_name()
-            );
-            continue;
-        };
+        let mut entry = DirectoryLayout_File::default();
+        let file_name = dir_entry.file_name().to_string_lossy().to_string();
         let mut file_path = path.to_path_buf();
         file_path.push(&file_name);
-        let file_path_string = if let Some(file_path) = file_path.to_str() {
-            file_path.to_owned()
-        } else {
-            error!(
-                "Unexpected error when converting path {:?} to string.",
-                file_path
-            );
-            continue;
-        };
-        entry.set_path(file_path_string.into());
+        entry.set_path((*file_path.to_string_lossy()).into());
         entry.set_file_name(file_name.into());
         entry.set_metadata(metadata);
         entries.push(entry);
     }
 
-    let mut list_dir_response = ListDirectoryResponse::default();
-    list_dir_response.set_files(entries.into());
-    Ok(list_dir_response)
+    let mut directory_layout = DirectoryLayout::default();
+    directory_layout.set_files(entries.into());
+    Ok(directory_layout)
 }
 
 fn retrieve_timestamp(
