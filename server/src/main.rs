@@ -19,7 +19,7 @@ use actix_web::{
     middleware::Logger,
     post,
     web::{self, Json},
-    App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
+    App, Error, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
 use deadpool_postgres::{
@@ -122,7 +122,7 @@ async fn download_files(req: HttpRequest, query: web::Query<DownloadFilesQuery>)
     match &query.paths[..] {
         [] => UnexpectedError.to_http_response(),
         [path] => match NamedFile::open(path) {
-            Ok(named_file) => named_file.respond_to(&req),
+            Ok(named_file) => named_file.prefer_utf8(true).into_response(&req),
             Err(err) => {
                 error!("Failed to open file {}: {}", path, err);
                 FileError::PermissionDenied.to_http_response()
@@ -130,7 +130,7 @@ async fn download_files(req: HttpRequest, query: web::Query<DownloadFilesQuery>)
         },
         _ => match files::compress_files(&query.paths).await {
             Ok(compressed_file) => match NamedFile::from_file(compressed_file, "target.tar.gz") {
-                Ok(named_file) => named_file.respond_to(&req),
+                Ok(named_file) => named_file.prefer_utf8(true).into_response(&req),
                 Err(err) => {
                     error!("Failed to open compressed file: {}", err);
                     FileError::PermissionDenied.to_http_response()
