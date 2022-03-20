@@ -192,6 +192,32 @@ async fn login_with_cookie(req: HttpRequest, app_data: web::Data<AppData>) -> Ht
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MakeDirectoryRequest {
+    directory_path: String,
+}
+
+#[post("/make_directory")]
+async fn make_directory(
+    req: HttpRequest,
+    make_directory_request: Json<MakeDirectoryRequest>,
+    app_data: web::Data<AppData>,
+) -> HttpResponse {
+    if let Err(err) = validate_cookie(&req, &app_data).await {
+        return err.to_http_response();
+    }
+    if let Err(err) = files::make_directory(
+        &app_data.root_path,
+        &PathBuf::from(&make_directory_request.directory_path),
+    )
+    .await
+    {
+        return err.to_http_response();
+    }
+    HttpResponse::Ok().finish()
+}
+
+#[derive(Deserialize)]
 struct DownloadFilesQuery {
     paths: Vec<String>,
 }
@@ -369,6 +395,7 @@ async fn main() -> std::io::Result<()> {
             .service(logout)
             .service(download_files)
             .service(upload_files)
+            .service(make_directory)
             .wrap(Logger::default())
     })
     .bind_rustls(("0.0.0.0", config.port), rustls_server_config)?

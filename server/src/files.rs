@@ -244,3 +244,12 @@ pub async fn upload_files(
 
     result
 }
+
+pub async fn make_directory(root_path: &Path, dir_path: &Path) -> Result<(), Box<dyn SPTFError>> {
+    let real_dir_path = real_path(root_path, dir_path);
+    if let Err(err) = tokio::fs::create_dir_all(&real_dir_path).await {
+        error!("Failed to create dir at {:?}: {}", real_dir_path, err);
+        return Err(FileError::PermissionDenied.to_boxed_self());
+    }
+    Ok(())
+}
