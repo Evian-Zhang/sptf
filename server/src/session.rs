@@ -120,6 +120,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
                         return;
                     }
                 };
+                if request.get_version() != crate::common::PROTOCOL_VERSION {
+                    warn!("Incompatible version: {}", request.get_version());
+                    let error = ProtobufError::WrongFormat;
+                    response.set_GeneralError(error.to_proto_error());
+                    ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
+                        warn!("Failed to write to bytes: {}", err);
+                        vec![]
+                    }));
+                    return;
+                }
                 let message_content = if let Some(message_content) = request.message_content {
                     message_content
                 } else {
@@ -158,6 +168,18 @@ impl Handler<RefreshFilesMessage> for UserSession {
         msg: RefreshFilesMessage,
         ctx: &mut ws::WebsocketContext<Self>,
     ) -> Self::Result {
-        unimplemented!()
+        if let Some(watched_path) = &self.watched_path {
+            if msg.file_paths.contains(watched_path) {
+                // TODO: How to debounce this?
+                let mut response = BasicOutcomingMessage::default();
+                response.set_version(crate::common::PROTOCOL_VERSION);
+                let list_directory_response = crate::files::list_dir(&watched_path);
+                response.set_ListDirectoryResponse(list_directory_response);
+                ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
+                    warn!("Failed to write to bytes: {}", err);
+                    vec![]
+                }));
+            }
+        }
     }
 }

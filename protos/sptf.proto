@@ -7,7 +7,7 @@ message ListDirectoryRequest {
 }
 
 message BasicIncomingMessage {
-    required int32 version = 1;
+    required uint32 version = 1;
     oneof message_content {
         ListDirectoryRequest ListDirectoryMessage = 2;
     } 
