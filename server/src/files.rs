@@ -11,11 +11,34 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
 
-pub fn list_dir(path: &Path) -> ListDirectoryResponse {
+/// Compose root path and user-aware path
+///
+/// Don't worry about attacker gives something like "../", it is restricted to access
+fn real_path(root_path: &Path, path: &Path) -> PathBuf {
+    let path = if let Ok(path) = path.strip_prefix("/") {
+        path.to_path_buf()
+    } else {
+        path.to_path_buf()
+    };
+    let mut real_path = root_path.to_path_buf();
+    real_path.push(path);
+    real_path
+}
+
+/// Extract user-aware path from root path and real path
+fn user_aware_path(root_path: &Path, real_path: &Path) -> Option<PathBuf> {
+    real_path
+        .strip_prefix(root_path)
+        .ok()
+        .map(Path::to_path_buf)
+}
+
+pub fn list_dir(root_path: &Path, user_aware_path: &Path) -> ListDirectoryResponse {
+    let real_path = real_path(root_path, user_aware_path);
     let mut list_directory_response = ListDirectoryResponse::default();
 
-    list_directory_response.set_directory_path((*path.to_string_lossy()).into());
-    match list_dir_internal(path) {
+    list_directory_response.set_directory_path((*real_path.to_string_lossy()).into());
+    match list_dir_internal(&root_path, &real_path) {
         Ok(directory_layout) => {
             list_directory_response.set_DirectoryLayout(directory_layout);
         }
@@ -27,12 +50,15 @@ pub fn list_dir(path: &Path) -> ListDirectoryResponse {
     list_directory_response
 }
 
-fn list_dir_internal(path: &Path) -> Result<DirectoryLayout, Box<dyn SPTFError>> {
-    let read_dir_result = fs::read_dir(path);
+fn list_dir_internal(
+    root_path: &Path,
+    real_path: &Path,
+) -> Result<DirectoryLayout, Box<dyn SPTFError>> {
+    let read_dir_result = fs::read_dir(real_path);
     let mut read_dir_iter = match read_dir_result {
         Ok(read_dir_iter) => read_dir_iter,
         Err(err) => {
-            error!("Failed to read dir {:?}: {}", path, err);
+            error!("Failed to read dir {:?}: {}", real_path, err);
             return Err(FileError::PermissionDenied.to_boxed_self());
         }
     };
@@ -44,7 +70,7 @@ fn list_dir_internal(path: &Path) -> Result<DirectoryLayout, Box<dyn SPTFError>>
                 break;
             }
             Some(Err(err)) => {
-                error!("Unexpected error when listing dir {:?}: {}", path, err);
+                error!("Unexpected error when listing dir {:?}: {}", real_path, err);
                 break;
             }
         };
@@ -107,8 +133,14 @@ fn list_dir_internal(path: &Path) -> Result<DirectoryLayout, Box<dyn SPTFError>>
         metadata.set_created_timestamp(created_timestamp);
         let mut entry = DirectoryLayout_File::default();
         let file_name = dir_entry.file_name().to_string_lossy().to_string();
-        let mut file_path = path.to_path_buf();
+        let mut file_path = real_path.to_path_buf();
         file_path.push(&file_name);
+        let file_path = if let Some(file_path) = user_aware_path(&root_path, &file_path) {
+            file_path
+        } else {
+            error!("Unexpected error here: cannot convert real path to user aware path");
+            return Err(UnexpectedError.to_boxed_self());
+        };
         entry.set_path((*file_path.to_string_lossy()).into());
         entry.set_file_name(file_name.into());
         entry.set_metadata(metadata);
@@ -141,7 +173,10 @@ fn retrieve_timestamp(
     Ok(timestamp)
 }
 
-pub async fn compress_files(files: &Vec<String>) -> Result<File, Box<dyn SPTFError>> {
+pub async fn compress_files(
+    root_path: &Path,
+    files: &Vec<String>,
+) -> Result<File, Box<dyn SPTFError>> {
     let temp_dir = match TempDir::new() {
         Ok(temp_dir) => temp_dir,
         Err(err) => {
@@ -157,17 +192,18 @@ pub async fn compress_files(files: &Vec<String>) -> Result<File, Box<dyn SPTFErr
         }
     };
     for file in files {
-        let file_path = PathBuf::from(file);
-        let file_name = if let Some(file_name) = file_path.file_name() {
+        let user_aware_file_path = PathBuf::from(file);
+        let file_name = if let Some(file_name) = user_aware_file_path.file_name() {
             file_name
         } else {
-            error!("Failed to extract file name of {:?}", file_path);
+            error!("Failed to extract file name of {:?}", user_aware_file_path);
             continue;
         };
         let mut temp_file = temp_dir.path().to_path_buf();
         temp_file.push(file_name);
-        if let Err(err) = tokio::fs::copy(file, temp_file).await {
-            error!("Failed to copy {:?}: {}", file, err);
+        let real_file_path = real_path(&root_path, &user_aware_file_path);
+        if let Err(err) = tokio::fs::copy(&real_file_path, temp_file).await {
+            error!("Failed to copy {:?}: {}", real_file_path, err);
             return Err(FileError::PermissionDenied.to_boxed_self());
         }
     }
@@ -188,17 +224,19 @@ pub async fn compress_files(files: &Vec<String>) -> Result<File, Box<dyn SPTFErr
 }
 
 pub async fn upload_files(
+    root_path: &Path,
     file_upload_request: FileUploadRequest,
 ) -> Result<(), Box<dyn SPTFError>> {
     let dir_path = file_upload_request.get_dir_path();
     let mut result = Ok(());
     for file in file_upload_request.get_uploaded_file() {
         let file_name = file.get_file_name();
-        let mut file_path = PathBuf::from(&dir_path);
-        file_path.push(file_name);
+        let mut user_aware_file_path = PathBuf::from(&dir_path);
+        user_aware_file_path.push(file_name);
+        let real_file_path = real_path(&root_path, &user_aware_file_path);
         let content = file.get_content();
-        if let Err(err) = tokio::fs::write(&file_path, content).await {
-            error!("Failed to write to {:?}: {}", file_path, err);
+        if let Err(err) = tokio::fs::write(&real_file_path, content).await {
+            error!("Failed to write to {:?}: {}", real_file_path, err);
             result = Err(FileError::PermissionDenied.to_boxed_self());
             continue;
         }

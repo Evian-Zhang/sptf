@@ -42,6 +42,7 @@ use redis::{
 use rustls::ServerConfig as RustlsServerConfig;
 use serde::{Deserialize, Serialize};
 use session::UserSession;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use tokio_postgres::{Config as PostgresConfig, NoTls};
 use uuid::Uuid;
@@ -55,6 +56,8 @@ struct AppData {
     /// Redis connection pool
     redis_connection_pool:
         deadpool::managed::Pool<deadpool_redis::Manager, deadpool_redis::Connection>,
+    /// Root path
+    root_path: PathBuf,
 }
 
 #[derive(Deserialize)]
@@ -211,7 +214,7 @@ async fn download_files(
                 FileError::PermissionDenied.to_http_response()
             }
         },
-        _ => match files::compress_files(&query.paths).await {
+        _ => match files::compress_files(&app_data.root_path, &query.paths).await {
             Ok(compressed_file) => match NamedFile::from_file(compressed_file, "target.tar.gz") {
                 Ok(named_file) => named_file.prefer_utf8(true).into_response(&req),
                 Err(err) => {
@@ -240,7 +243,7 @@ async fn upload_files(
             return UnexpectedError.to_http_response();
         }
     };
-    if let Err(err) = files::upload_files(file_upload_request).await {
+    if let Err(err) = files::upload_files(&app_data.root_path, file_upload_request).await {
         err.to_http_response()
     } else {
         HttpResponse::Ok().finish()
@@ -273,7 +276,11 @@ async fn index(
         }
     };
     let resp = ws::start(
-        UserSession::new(app_data.manager_address.clone(), user_id),
+        UserSession::new(
+            app_data.manager_address.clone(),
+            user_id,
+            app_data.root_path.clone(),
+        ),
         &req,
         stream,
     );
@@ -315,12 +322,13 @@ async fn main() -> std::io::Result<()> {
 
     // Config filewatcher
     let cloned_manager_address = manager_address.clone();
+    let root_path = config.sptf_path.clone();
     let filewatcher_addr = SyncArbiter::start(1, move || {
         let (tx, rx) = mpsc::channel();
         let mut watcher = notify::watcher(tx, common::FILEWATCHER_DEBOUNCE_DURATION)
             .expect("Unable to setup watcher");
         watcher
-            .watch(&config.sptf_path, RecursiveMode::Recursive)
+            .watch(&root_path, RecursiveMode::Recursive)
             .expect("Unable to setup watcher");
         FileWatcherActor::new(cloned_manager_address.clone(), rx)
     });
@@ -352,6 +360,7 @@ async fn main() -> std::io::Result<()> {
                 manager_address: manager_address.clone(),
                 database_connection_pool: postgres_pool.clone(),
                 redis_connection_pool: redis_pool.clone(),
+                root_path: config.sptf_path.clone(),
             }))
             .app_data(PayloadConfig::default().limit(common::MAX_FILE_UPLOAD_SIZE))
             .service(index)

@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::iter;
+use std::path::PathBuf;
 
 /// Raw Config in file format
 #[derive(Deserialize)]
@@ -33,7 +34,7 @@ pub struct Config {
     /// Private key
     pub private_key: PrivateKey,
     /// Path for our server to serve files in
-    pub sptf_path: String,
+    pub sptf_path: PathBuf,
     pub database_port: u16,
     pub database_username: String,
     pub database_password: String,
@@ -81,7 +82,7 @@ pub fn get_config() -> Config {
         port,
         certificate_chain,
         private_key,
-        sptf_path,
+        sptf_path: PathBuf::from(sptf_path),
         database_port,
         database_username,
         database_password,

@@ -30,17 +30,23 @@ pub struct UserSession {
     manager_address: Addr<crate::manager::SessionManager>,
     /// User watched paths
     watched_path: Option<PathBuf>,
+    root_path: PathBuf,
 }
 
 impl UserSession {
     /// Create a new user session
-    pub fn new(manager_address: Addr<crate::manager::SessionManager>, user_id: Uuid) -> Self {
+    pub fn new(
+        manager_address: Addr<crate::manager::SessionManager>,
+        user_id: Uuid,
+        root_path: PathBuf,
+    ) -> Self {
         Self {
             session_id: None,
             user_id,
             heartbeat: Instant::now(),
             manager_address,
             watched_path: None,
+            root_path,
         }
     }
 
@@ -145,8 +151,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
                 use crate::protos::sptf::BasicIncomingMessage_oneof_message_content::*;
                 match message_content {
                     ListDirectoryMessage(list_directory_request) => {
-                        let list_directory_response =
-                            crate::files::list_dir(&Path::new(list_directory_request.get_path()));
+                        let list_directory_response = crate::files::list_dir(
+                            &self.root_path,
+                            &Path::new(list_directory_request.get_path()),
+                        );
                         response.set_ListDirectoryResponse(list_directory_response);
                         ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
                             warn!("Failed to write to bytes: {}", err);
@@ -173,7 +181,8 @@ impl Handler<RefreshFilesMessage> for UserSession {
                 // TODO: How to debounce this?
                 let mut response = BasicOutcomingMessage::default();
                 response.set_version(crate::common::PROTOCOL_VERSION);
-                let list_directory_response = crate::files::list_dir(&watched_path);
+                let list_directory_response =
+                    crate::files::list_dir(&self.root_path, &watched_path);
                 response.set_ListDirectoryResponse(list_directory_response);
                 ctx.binary(response.write_to_bytes().unwrap_or_else(|err| {
                     warn!("Failed to write to bytes: {}", err);
