@@ -1,5 +1,7 @@
-mod manager_to_session;
-mod session_to_manager;
+mod filewatcher_received;
+mod manager_received;
+mod session_received;
 
-pub use manager_to_session::*;
-pub use session_to_manager::*;
+pub use filewatcher_received::*;
+pub use manager_received::*;
+pub use session_received::*;

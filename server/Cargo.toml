@@ -27,6 +27,7 @@ redis = "0.21"
 deadpool-redis = "0.10"
 uuid = { version = "0.8", features = ["v4"] }
 sha2 = "0.10"
+notify = "4.0"
 
 [build-dependencies]
 protobuf-codegen-pure = "~2"

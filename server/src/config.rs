@@ -11,6 +11,8 @@ struct RawConfig {
     port: u16,
     /// PEM file path
     pem_file_path: String,
+    /// Path for our server to serve files in
+    sptf_path: String,
     database_port: u16,
     database_username: String,
     database_password: String,
@@ -27,6 +29,8 @@ pub struct Config {
     pub certificate: Vec<u8>,
     /// Private key
     pub private_key: Vec<u8>,
+    /// Path for our server to serve files in
+    pub sptf_path: String,
     pub database_port: u16,
     pub database_username: String,
     pub database_password: String,
@@ -42,6 +46,7 @@ pub fn get_config() -> Config {
     let RawConfig {
         port,
         pem_file_path,
+        sptf_path,
         database_port,
         database_username,
         database_password,
@@ -69,6 +74,7 @@ pub fn get_config() -> Config {
         port,
         certificate,
         private_key,
+        sptf_path,
         database_port,
         database_username,
         database_password,

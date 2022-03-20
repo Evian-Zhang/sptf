@@ -4,6 +4,7 @@ mod common;
 mod config;
 mod error;
 mod files;
+mod filewatcher;
 mod manager;
 mod messages;
 mod protos;
@@ -26,8 +27,10 @@ use deadpool_postgres::{
 use deadpool_redis::{Config as DeadpoolRedisConfig, Runtime as DeadpoolRedisRuntime};
 use env_logger::Env;
 use error::{SPTFError, UnexpectedError};
+use filewatcher::FileWatcherActor;
 use log::error;
 use manager::SessionManager;
+use notify::{RecursiveMode, Watcher};
 use redis::{
     ConnectionAddr as RedisConnectionAddr, ConnectionInfo as RedisConnectionTotalInfo,
     RedisConnectionInfo,
@@ -35,6 +38,7 @@ use redis::{
 use rustls::{Certificate, PrivateKey, ServerConfig as RustlsServerConfig};
 use serde::{Deserialize, Serialize};
 use session::UserSession;
+use std::sync::mpsc;
 use tokio_postgres::{Config as PostgresConfig, NoTls};
 
 /// Shared app data
@@ -180,6 +184,22 @@ async fn main() -> std::io::Result<()> {
 
     // Config session manager actor
     let manager_address = SessionManager::new().start();
+
+    // Config filewatcher
+    let cloned_manager_address = manager_address.clone();
+    let filewatcher_addr = SyncArbiter::start(1, move || {
+        let (tx, rx) = mpsc::channel();
+        let mut watcher = notify::watcher(tx, common::FILEWATCHER_DEBOUNCE_DURATION)
+            .expect("Unable to setup watcher");
+        watcher
+            .watch(&config.sptf_path, RecursiveMode::Recursive)
+            .expect("Unable to setup watcher");
+        FileWatcherActor::new(cloned_manager_address.clone(), rx)
+    });
+    filewatcher_addr.do_send(crate::messages::StartWatchingFiles);
+    manager_address.do_send(crate::messages::AddFilewatcher {
+        addr: filewatcher_addr,
+    });
 
     // Config redis cache
     let redis_connection_total_info = RedisConnectionTotalInfo {
