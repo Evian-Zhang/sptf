@@ -176,9 +176,11 @@ pub async fn compress_files(files: &Vec<String>) -> Result<File, Box<dyn SPTFErr
     let mut tar = tar::Builder::new(enc);
     if let Err(err) = tar.append_dir_all("target", temp_dir.path()) {
         error!("Failed to add dirs to tar: {}", err);
+        return Err(UnexpectedError.to_boxed_self());
     }
     if let Err(err) = tar.finish() {
         error!("Failed to finish tar: {}", err);
+        return Err(UnexpectedError.to_boxed_self());
     }
     drop(tar);
 
