@@ -1,4 +1,5 @@
-use rustls_pemfile::Item;
+use rustls::{Certificate, PrivateKey};
+use rustls_pemfile::{certs, Item};
 use serde::Deserialize;
 use std::fs::{self, File};
 use std::io::BufReader;
@@ -9,8 +10,10 @@ use std::iter;
 struct RawConfig {
     /// Server port
     port: u16,
-    /// PEM file path
-    pem_file_path: String,
+    /// Certificate PEM file path
+    cert_file_path: String,
+    /// Private key PEM file path
+    private_key_file_path: String,
     /// Path for our server to serve files in
     sptf_path: String,
     database_port: u16,
@@ -26,9 +29,9 @@ pub struct Config {
     /// Server port
     pub port: u16,
     /// Certificate
-    pub certificate: Vec<u8>,
+    pub certificate_chain: Vec<Certificate>,
     /// Private key
-    pub private_key: Vec<u8>,
+    pub private_key: PrivateKey,
     /// Path for our server to serve files in
     pub sptf_path: String,
     pub database_port: u16,
@@ -45,7 +48,8 @@ pub struct Config {
 pub fn get_config() -> Config {
     let RawConfig {
         port,
-        pem_file_path,
+        cert_file_path,
+        private_key_file_path,
         sptf_path,
         database_port,
         database_username,
@@ -55,24 +59,27 @@ pub fn get_config() -> Config {
         redis_password,
     } = toml::from_str::<RawConfig>(&fs::read_to_string("./config.toml").unwrap()).unwrap();
 
-    let mut certificate = None;
+    let cert_file = &mut BufReader::new(File::open(cert_file_path).unwrap());
+    let certificate_chain = certs(cert_file)
+        .unwrap()
+        .into_iter()
+        .map(Certificate)
+        .collect();
     let mut private_key = None;
-    let mut reader = BufReader::new(File::open(pem_file_path).unwrap());
+    let mut reader = BufReader::new(File::open(private_key_file_path).unwrap());
     for item in iter::from_fn(|| rustls_pemfile::read_one(&mut reader).transpose()) {
         match item.unwrap() {
-            Item::X509Certificate(cert) => certificate = Some(cert),
             Item::RSAKey(rsa_key) => private_key = Some(rsa_key),
             Item::PKCS8Key(pcks8_key) => private_key = Some(pcks8_key),
             Item::ECKey(ec_key) => private_key = Some(ec_key),
             _ => {}
         }
     }
-    let certificate = certificate.expect("No certificate detected.");
-    let private_key = private_key.expect("No key detected.");
+    let private_key = PrivateKey(private_key.expect("No key detected."));
 
     Config {
         port,
-        certificate,
+        certificate_chain,
         private_key,
         sptf_path,
         database_port,

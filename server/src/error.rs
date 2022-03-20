@@ -22,7 +22,7 @@ pub trait SPTFError {
     }
 
     fn to_http_response(&self) -> HttpResponse {
-        HttpResponse::Ok()
+        HttpResponse::InternalServerError()
             .content_type(ContentType::json())
             .body(self.to_json_string())
     }

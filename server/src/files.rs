@@ -3,11 +3,13 @@ use crate::protos::sptf::{
     DirectoryLayout, DirectoryLayout_File, DirectoryLayout_FileMetadata,
     DirectoryLayout_FileMetadata_FileType, ListDirectoryResponse,
 };
+use flate2::{write::GzEncoder, Compression};
 use log::{error, warn};
-use std::fs;
+use std::fs::{self, File};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tempfile::TempDir;
 
 pub fn list_dir(path: &Path) -> ListDirectoryResponse {
     let mut list_directory_response = ListDirectoryResponse::default();
@@ -137,4 +139,48 @@ fn retrieve_timestamp(
     };
     let timestamp = duration.as_secs();
     Ok(timestamp)
+}
+
+pub async fn compress_files(files: &Vec<String>) -> Result<File, Box<dyn SPTFError>> {
+    let temp_dir = match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(err) => {
+            error!("Failed to create temp dir: {}", err);
+            return Err(UnexpectedError.to_boxed_self());
+        }
+    };
+    let temp_compressed_file = match tempfile::tempfile() {
+        Ok(temp_compressed_file) => temp_compressed_file,
+        Err(err) => {
+            error!("Failed to create temp file: {}", err);
+            return Err(UnexpectedError.to_boxed_self());
+        }
+    };
+    for file in files {
+        let file_path = PathBuf::from(file);
+        let file_name = if let Some(file_name) = file_path.file_name() {
+            file_name
+        } else {
+            error!("Failed to extract file name of {:?}", file_path);
+            continue;
+        };
+        let mut temp_file = temp_dir.path().to_path_buf();
+        temp_file.push(file_name);
+        if let Err(err) = tokio::fs::copy(file, temp_file).await {
+            error!("Failed to copy {:?}: {}", file, err);
+            return Err(FileError::PermissionDenied.to_boxed_self());
+        }
+    }
+
+    let enc = GzEncoder::new(&temp_compressed_file, Compression::default());
+    let mut tar = tar::Builder::new(enc);
+    if let Err(err) = tar.append_dir_all("target", temp_dir.path()) {
+        error!("Failed to add dirs to tar: {}", err);
+    }
+    if let Err(err) = tar.finish() {
+        error!("Failed to finish tar: {}", err);
+    }
+    drop(tar);
+
+    Ok(temp_compressed_file)
 }

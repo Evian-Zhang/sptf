@@ -12,13 +12,14 @@ mod session;
 mod user;
 
 use actix::prelude::*;
+use actix_files::NamedFile;
 use actix_web::{
     get,
     http::header::ContentType,
     middleware::Logger,
     post,
     web::{self, Json},
-    App, Error, HttpRequest, HttpResponse, HttpServer,
+    App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
 };
 use actix_web_actors::ws;
 use deadpool_postgres::{
@@ -26,7 +27,7 @@ use deadpool_postgres::{
 };
 use deadpool_redis::{Config as DeadpoolRedisConfig, Runtime as DeadpoolRedisRuntime};
 use env_logger::Env;
-use error::{SPTFError, UnexpectedError};
+use error::{FileError, SPTFError, UnexpectedError};
 use filewatcher::FileWatcherActor;
 use log::error;
 use manager::SessionManager;
@@ -35,7 +36,7 @@ use redis::{
     ConnectionAddr as RedisConnectionAddr, ConnectionInfo as RedisConnectionTotalInfo,
     RedisConnectionInfo,
 };
-use rustls::{Certificate, PrivateKey, ServerConfig as RustlsServerConfig};
+use rustls::ServerConfig as RustlsServerConfig;
 use serde::{Deserialize, Serialize};
 use session::UserSession;
 use std::sync::mpsc;
@@ -112,6 +113,35 @@ async fn login(login_request: Json<LoginRequest>, app_data: web::Data<AppData>) 
 }
 
 #[derive(Deserialize)]
+struct DownloadFilesQuery {
+    paths: Vec<String>,
+}
+
+#[get("/download")]
+async fn download_files(req: HttpRequest, query: web::Query<DownloadFilesQuery>) -> HttpResponse {
+    match &query.paths[..] {
+        [] => UnexpectedError.to_http_response(),
+        [path] => match NamedFile::open(path) {
+            Ok(named_file) => named_file.respond_to(&req),
+            Err(err) => {
+                error!("Failed to open file {}: {}", path, err);
+                FileError::PermissionDenied.to_http_response()
+            }
+        },
+        _ => match files::compress_files(&query.paths).await {
+            Ok(compressed_file) => match NamedFile::from_file(compressed_file, "target.tar.gz") {
+                Ok(named_file) => named_file.respond_to(&req),
+                Err(err) => {
+                    error!("Failed to open compressed file: {}", err);
+                    FileError::PermissionDenied.to_http_response()
+                }
+            },
+            Err(err) => err.to_http_response(),
+        },
+    }
+}
+
+#[derive(Deserialize)]
 struct WebsocketEstablishRequestQuery {
     auth_token: String,
 }
@@ -157,10 +187,7 @@ async fn main() -> std::io::Result<()> {
     let rustls_server_config = RustlsServerConfig::builder()
         .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(
-            vec![Certificate(config.certificate)],
-            PrivateKey(config.private_key),
-        )
+        .with_single_cert(config.certificate_chain, config.private_key)
         .unwrap();
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
@@ -226,6 +253,7 @@ async fn main() -> std::io::Result<()> {
                 redis_connection_pool: redis_pool.clone(),
             }))
             .service(index)
+            .service(download_files)
             .wrap(Logger::default())
     })
     .bind_rustls(("0.0.0.0", config.port), rustls_server_config)?

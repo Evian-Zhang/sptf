@@ -11,6 +11,7 @@ actix = "0.13"
 actix-web = { version = "4", features = ["rustls"] }
 actix-web-actors = "4"
 actix-tls = "3"
+actix-files = "0.6"
 rustls = "0.20"
 rustls-pemfile = "0.3"
 serde = { version = "1", features = ["derive"] }
@@ -28,6 +29,9 @@ deadpool-redis = "0.10"
 uuid = { version = "0.8", features = ["v4"] }
 sha2 = "0.10"
 notify = "4.0"
+flate2 = "1.0"
+tar = "0.4"
+tempfile = "3.3"
 
 [build-dependencies]
 protobuf-codegen-pure = "~2"
