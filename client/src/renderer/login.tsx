@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Form,
   Input,
   Button,
   Modal,
+  message
 } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login, loginWithCookie } from './custom-utils/conn';
@@ -15,36 +16,55 @@ export interface LoginProps {
   toSignup: () => void,
 }
 
+enum LoginValidationStatus {
+  NoLogin,
+  Validating,
+  Invalid,
+}
+
 function Login(props: LoginProps) {
-  const [validating, setValidating] = useState(false);
+  const [validating, setValidating] = useState(LoginValidationStatus.NoLogin);
   const [loginForm] = Form.useForm();
-  window.sptfAPI.getCookie()
-    .then((authToken) => {
-      if (authToken) {
-        setValidating(true);
-        loginWithCookie()
-          .then((isSuccess) => {
-            setValidating(false);
-            if (isSuccess) {
-              props.setAuthTokenAndToFileBrowser(authToken);
-            }
-          })
-      }
-    })
+  useEffect(() => {
+    window.sptfAPI.getCookie()
+      .then((authToken) => {
+        if (authToken) {
+          setValidating(LoginValidationStatus.Validating);
+          loginWithCookie()
+            .then((isSuccess) => {
+              if (isSuccess) {
+                setValidating(LoginValidationStatus.NoLogin);
+                props.setAuthTokenAndToFileBrowser(authToken);
+              } else {
+                setValidating(LoginValidationStatus.Invalid);
+              }
+            })
+        }
+      })
+  }, []);
   
   function onFinish() {
-    setValidating(true);
+    setValidating(LoginValidationStatus.Validating);
     const username = loginForm.getFieldValue("username");
     const password = loginForm.getFieldValue("password");
     login(username, password)
       .then((authToken) => {
-        setValidating(false);
+        setValidating(LoginValidationStatus.NoLogin);
         props.setAuthTokenAndToFileBrowser(authToken);
+      })
+      .catch((reason) => {
+        setValidating(LoginValidationStatus.Invalid);
+        message.error(reason);
       });
   }
 
   function onGoToSignupPageButtonPressed() {
     props.toSignup();
+  }
+
+  function onLoginFailedButtonPressed() {
+    setValidating(LoginValidationStatus.NoLogin);
+    loginForm.resetFields();
   }
 
   return (
@@ -77,13 +97,22 @@ function Login(props: LoginProps) {
       </Form>
 
       <Modal
-        visible={validating}
+        visible={validating === LoginValidationStatus.Validating}
         centered
         footer={null}
         closable={false}
         maskClosable={false}
       >
         正在验证身份...
+      </Modal>
+      <Modal
+        visible={validating === LoginValidationStatus.Invalid}
+        onOk={onLoginFailedButtonPressed}
+        centered
+        okText={"确认"}
+        cancelButtonProps={{ style: { display: "none" } }}
+      >
+        验证失败！
       </Modal>
     </React.Fragment>
   );

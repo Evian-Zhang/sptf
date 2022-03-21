@@ -4,6 +4,7 @@ import {
   Input,
   Button,
   Modal,
+  message,
 } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { signup } from './custom-utils/conn';
@@ -18,6 +19,7 @@ enum SignupValidationStatus {
   NoSignup,
   Validating,
   Valid,
+  Invalid,
 }
 
 function Signup(props: SignupProps) {
@@ -31,6 +33,10 @@ function Signup(props: SignupProps) {
     signup(username, password)
       .then(() => {
         setValidationStatus(SignupValidationStatus.Valid);
+      })
+      .catch((reason) => {
+        setValidationStatus(SignupValidationStatus.Invalid);
+        message.error(reason);
       });
   }
 
@@ -41,6 +47,11 @@ function Signup(props: SignupProps) {
   function onSignupSuccessButtonPressed() {
     setValidationStatus(SignupValidationStatus.NoSignup);
     props.toLogin();
+  }
+
+  function onSignupFailedButtonPressed() {
+    setValidationStatus(SignupValidationStatus.NoSignup);
+    signupForm.resetFields();
   }
 
   return (
@@ -114,6 +125,15 @@ function Signup(props: SignupProps) {
         cancelButtonProps={{ style: { display: "none" } }}
       >
         注册成功！
+      </Modal>
+      <Modal
+        visible={validationStatus === SignupValidationStatus.Invalid}
+        onOk={onSignupFailedButtonPressed}
+        centered
+        okText={"确认"}
+        cancelButtonProps={{ style: { display: "none" } }}
+      >
+        注册失败！
       </Modal>
     </React.Fragment>
   );
