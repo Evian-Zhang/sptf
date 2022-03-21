@@ -29,3 +29,5 @@ npm-debug.log.*
 *.scss.d.ts
 
 .vscode/
+src/renderer/custom-utils/protos.d.ts
+src/renderer/custom-utils/protos.js

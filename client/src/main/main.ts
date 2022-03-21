@@ -14,6 +14,7 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
+import { getCookie, setCookie } from './custom-utils/sptf-cookie';
 
 export default class AppUpdater {
   constructor() {
@@ -24,12 +25,6 @@ export default class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
-
-ipcMain.on('ipc-example', async (event, arg) => {
-  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
-  event.reply('ipc-example', msgTemplate('pong'));
-});
 
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
@@ -58,7 +53,8 @@ const installExtensions = async () => {
 
 const createWindow = async () => {
   if (isDevelopment) {
-    await installExtensions();
+    // Disable this in order to tolerant the GFW
+    // await installExtensions();
   }
 
   const RESOURCES_PATH = app.isPackaged
@@ -125,6 +121,11 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    ipcMain.handle('sptf:getCookie', getCookie);
+    ipcMain.handle('sptf:setCookie', async (event, authToken: string) => {
+      const result = await setCookie(authToken);
+      return result;
+    });
     createWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
