@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { Layout } from 'antd';
 import './App.css';
 import Login from './login'
+import Signup from './signup';
 
 const { Header, Content } = Layout;
 
@@ -18,6 +19,9 @@ const Index = () => {
   const toSignup = () => {
     setHomepageComponentStatus(HomepageComponentStatus.Signup);
   };
+  const toLogin = () => {
+    setHomepageComponentStatus(HomepageComponentStatus.Login);
+  };
   const childComponentSetAuthTokenAndToFileBrowser = (authToken: string) => {
     setAuthToken(authToken);
     setHomepageComponentStatus(HomepageComponentStatus.Filebrowser);
@@ -31,9 +35,15 @@ const Index = () => {
             setAuthTokenAndToFileBrowser={childComponentSetAuthTokenAndToFileBrowser}
             toSignup={toSignup}
           />
+        );
+      }
+      case HomepageComponentStatus.Signup: {
+        return (
+          <Signup
+            toLogin={toLogin}
+          />
         )
       }
-      case HomepageComponentStatus.Signup: break;
       case HomepageComponentStatus.Filebrowser: break;
     }
   }

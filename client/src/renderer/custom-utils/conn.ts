@@ -6,4 +6,8 @@ async function loginWithCookie(): Promise<boolean> {
     return Promise.resolve(true);
 }
 
-export { login, loginWithCookie };
+async function signup(username: string, password: string) {
+    return Promise.resolve();
+}
+
+export { login, loginWithCookie, signup };
