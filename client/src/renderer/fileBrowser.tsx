@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles } from './custom-utils/conn';
+import { createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles, makeDirectory, logout } from './custom-utils/conn';
 import {
   Button,
   Modal,
@@ -37,9 +37,12 @@ function FileBrowser(props: FileBrowserProps) {
   const [uploading, setUploading] = useState(false); // is file upload modal opened
   const [uploadedFiles, setUploadedFiles] = useState<{fileName: string, content: Blob}[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false); // is sending file
+  const [creatingDirectory, setCreatingDirectory] = useState(false); // is creating diretcory modal opened
+  const [isCreatingDirectory, setIsCreatingDirectory] = useState(false); // is sending creating directory command
+  const [newDirectoryName, setNewDirectoryName] = useState("");
 
   useEffect(() => {
-    createWebsocket()
+    createWebsocket(props.authToken)
       .then((websocket) => {
         setWebsocket(websocket);
         websocket.onerror = () => {
@@ -202,6 +205,26 @@ function FileBrowser(props: FileBrowserProps) {
             >
               下载
             </Button>,
+            <Button
+              key="makeDirectory"
+              disabled={selectedIndices.size === 0}
+              onClick={() => {
+                setCreatingDirectory(true);
+              }}
+            >
+              创建新目录
+            </Button>,
+            <Button
+              key="logout"
+              disabled={selectedIndices.size === 0}
+              onClick={() => {
+                logout().then(() => {
+                  props.onAuthFailed();
+                })
+              }}
+            >
+              退出登录
+            </Button>,
           ]}
           style={{height: "fitContent", top: 0}}
         />
@@ -275,18 +298,62 @@ function FileBrowser(props: FileBrowserProps) {
             onClick={() => {
               if (currentDirPath) {
                 setIsUploadingFiles(true);
-                uploadFiles(props.authToken, currentDirPath, uploadedFiles)
+                uploadFiles(currentDirPath, uploadedFiles)
                   .then(() => {
                     setIsUploadingFiles(false);
+                    setUploading(false);
+                    setUploadedFiles([]);
                   })
                   .catch((reason) => {
                     message.error(reason);
                     setIsUploadingFiles(false);
+                    setUploading(false);
+                    setUploadedFiles([]);
                   })
               }
             }}
           >
             上传
+          </Button>
+        </Modal>
+        <Modal
+          visible={creatingDirectory}
+          closable={isCreatingDirectory}
+          maskClosable={isCreatingDirectory}
+          footer={null}
+        >
+          <Input
+            placeholder="请输入目录名"
+            onChange={(event) => {
+              const dirName = event.target.value;
+              let directoryPath = "";
+              if (currentDirPath) {
+                if (currentDirPath.endsWith('/')) {
+                  directoryPath = `${currentDirPath}${dirName}`;
+                } else {
+                  directoryPath = `${currentDirPath}/${dirName}`;
+                }
+              }
+              setNewDirectoryName(directoryPath);
+            }}
+          />
+          <Button
+            onClick={() => {
+              makeDirectory(newDirectoryName)
+                .then(() => {
+                  setIsCreatingDirectory(false);
+                  setCreatingDirectory(false);
+                  setNewDirectoryName("");
+                })
+                .catch((reason) => {
+                  message.error(reason);
+                  setIsCreatingDirectory(false);
+                  setCreatingDirectory(false);
+                  setNewDirectoryName("");
+                });
+            }}
+          >
+            确认
           </Button>
         </Modal>
       </div>

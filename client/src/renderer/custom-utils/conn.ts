@@ -1,22 +1,65 @@
 import { sptf } from './protos';
-import { handleErrorCode } from './error_handling';
+import { handleErrorCode, handleNonOkHttpResponse } from './error_handling';
+
+const SERVER_DOMAIN = "https://evian-workstation.local";
 
 /** This method may throw */
 async function login(username: string, password: string): Promise<string> {
-    return Promise.resolve("");
+    const rawResponse = await fetch(`${SERVER_DOMAIN}/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({username: username, password: password}),
+        mode: "no-cors"
+    });
+    if (!rawResponse.ok) {
+        await handleNonOkHttpResponse(rawResponse);
+    }
+    const response = await rawResponse.json();
+    return Promise.resolve(response.authToken);
+}
+
+async function logout() {
+    const rawResponse = await fetch(`${SERVER_DOMAIN}/logout`, {
+        method: "POST",
+        mode: "no-cors",
+        credentials: "include",
+    });
+    if (!rawResponse.ok) {
+        await handleNonOkHttpResponse(rawResponse);
+    }
+    return Promise.resolve();
 }
 
 /** This method does not throw */
 async function loginWithCookie(): Promise<boolean> {
+    const rawResponse = await fetch(`${SERVER_DOMAIN}/login_with_cookie`, {
+        method: "POST",
+        mode: "no-cors",
+        credentials: "include",
+    });
+    if (!rawResponse.ok) {
+        await handleNonOkHttpResponse(rawResponse);
+    }
     return Promise.resolve(true);
 }
 
 /** This method may throw */
 async function signup(username: string, password: string) {
+    const rawResponse = await fetch(`${SERVER_DOMAIN}/signup`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({username: username, password: password}),
+        mode: "no-cors"
+    });
+    if (!rawResponse.ok) {
+        await handleNonOkHttpResponse(rawResponse);
+    }
     return Promise.resolve();
 }
-
-const WEBSOCKET_URL = "wss://evian-workstation.local";
 
 // see https://dev.to/ndrbrt/wait-for-the-websocket-connection-to-be-open-before-sending-a-message-1h12
 const waitForOpenConnection = (socket: WebSocket) => {
@@ -38,8 +81,10 @@ const waitForOpenConnection = (socket: WebSocket) => {
     });
 }
 
-async function createWebsocket(): Promise<WebSocket> {
-    let websocket = new WebSocket(WEBSOCKET_URL);
+const WEBSOCKET_URL = "wss://evian-workstation.local";
+
+async function createWebsocket(authToken: string): Promise<WebSocket> {
+    let websocket = new WebSocket(`${WEBSOCKET_URL}/ws?authToken=${authToken}`);
     await waitForOpenConnection(websocket);
     return websocket;
 }
@@ -74,15 +119,50 @@ function requestChangeDir(websocket: WebSocket, target_dir_path: string) {
 
 function downloadFiles(authToken: string, filePaths: string[]) {
     const anchor = document.createElement('a');
-    anchor.href = ""; // TODO
+    anchor.href = `${SERVER_DOMAIN}/download?paths=${filePaths.join(',')}`;
     anchor.download = '';
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
 }
 
-async function uploadFiles(authToken: string, currentDir: string, files: {fileName: string, content: Blob}[]) {
-
+async function uploadFiles(currentDir: string, files: {fileName: string, content: Blob}[]) {
+    let uploadedFiles = [];
+    for (let file of files) {
+        const dataArray = await new Response(file.content).arrayBuffer();
+        const content = new Uint8Array(dataArray)
+        uploadedFiles.push({fileName: file.fileName, content: content});
+    }
+    const fileUploadRequest = sptf.FileUploadRequest.encode({
+        dirPath: currentDir,
+        uploadedFile: uploadedFiles
+    });
+    const rawResponse = await fetch(`${SERVER_DOMAIN}/upload`, {
+        method: "POST",
+        body: fileUploadRequest.finish(),
+        mode: "no-cors",
+        credentials: "include",
+    });
+    if (!rawResponse.ok) {
+        await handleNonOkHttpResponse(rawResponse);
+    }
+    return Promise.resolve();
 }
 
-export { login, loginWithCookie, signup, createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles };
+async function makeDirectory(directoryPath: string) {
+    const rawResponse = await fetch(`${SERVER_DOMAIN}/make_directory`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({directoryPath: directoryPath}),
+        mode: "no-cors",
+        credentials: "include",
+    });
+    if (!rawResponse.ok) {
+        await handleNonOkHttpResponse(rawResponse);
+    }
+    return Promise.resolve();
+}
+
+export { login, loginWithCookie, logout, signup, createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles, makeDirectory };

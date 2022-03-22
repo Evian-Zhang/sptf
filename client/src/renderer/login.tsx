@@ -31,6 +31,7 @@ function Login(props: LoginProps) {
       window.sptfAPI.getCookie()
         .then((authToken) => {
           if (authToken) {
+            document.cookie = `SPTF_AUTH=${authToken};samesite=none;expires=${new Date(2200, 1).toUTCString}`;
             setValidating(LoginValidationStatus.Validating);
             loginWithCookie()
               .then((isSuccess) => {

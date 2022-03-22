@@ -24,15 +24,16 @@ async function handleNonOkHttpResponse(response: Response) {
     if (response.status != 500) {
         throw "未知错误";
     }
+    let response_json: SPTFError;
     try {
-        const response_json: SPTFError = await response.json();
-        if (!response_json || !response_json.errorCode) {
-            throw "未知错误";
-        }
-        throw handleErrorCode(response_json.errorCode);
+        response_json = await response.json();
     } catch {
         throw "未知错误";
     }
+    if (!response_json || !response_json.errorCode) {
+        throw "未知错误";
+    }
+    throw handleErrorCode(response_json.errorCode);
 }
 
 export { handleErrorCode, handleNonOkHttpResponse };
