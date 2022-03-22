@@ -72,4 +72,17 @@ function requestChangeDir(websocket: WebSocket, target_dir_path: string) {
     websocket.send(data);
 }
 
-export { login, loginWithCookie, signup, createWebsocket, handleWebsocketData, requestChangeDir };
+function downloadFiles(authToken: string, filePaths: string[]) {
+    const anchor = document.createElement('a');
+    anchor.href = ""; // TODO
+    anchor.download = '';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+}
+
+async function uploadFiles(authToken: string, currentDir: string, files: {fileName: string, content: Blob}[]) {
+
+}
+
+export { login, loginWithCookie, signup, createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles };

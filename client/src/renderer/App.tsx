@@ -26,11 +26,13 @@ const Index = () => {
   };
   const childComponentSetAuthTokenAndToFileBrowser = (authToken: string) => {
     setAuthToken(authToken);
+    document.cookie = `SPTF_AUTH=${authToken};samesite=none;expires=${new Date(2200, 1).toUTCString}`;
     setHomepageComponentStatus(HomepageComponentStatus.Filebrowser);
   }
   const onFileBrowserAuthFailed = () => {
     setLoginShouldUseCookie(false);
     window.sptfAPI.removeCookie();
+    document.cookie = `SPTF_AUTH=; Max-Age=0`;
     setAuthToken(null);
     setHomepageComponentStatus(HomepageComponentStatus.Login);
   };

@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { createWebsocket, handleWebsocketData, requestChangeDir } from './custom-utils/conn';
+import { createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles } from './custom-utils/conn';
 import {
   Button,
   Modal,
   PageHeader,
   Row,
   Col,
-  Card
+  Card,
+  List,
+  Input,
+  message
 } from 'antd';
 import { handleErrorCode } from './custom-utils/error_handling';
 import { sptf } from './custom-utils/protos';
@@ -31,6 +34,9 @@ function FileBrowser(props: FileBrowserProps) {
   const [closableError, setClosableError] = useState<string | null>(null);
   const [files, setFiles] = useState<sptf.DirectoryLayout.IFile[]>([]);
   const [selectedIndices, setSelectedIndices] = useState(new Set<number>());
+  const [uploading, setUploading] = useState(false); // is file upload modal opened
+  const [uploadedFiles, setUploadedFiles] = useState<{fileName: string, content: Blob}[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false); // is sending file
 
   useEffect(() => {
     createWebsocket()
@@ -46,7 +52,8 @@ function FileBrowser(props: FileBrowserProps) {
               if (listDirectoryResponse.directoryPath === targetDirPath) {
                 if (listDirectoryResponse.DirectoryLayout) {
                   setCurrentDirPath(targetDirPath);
-                  setFiles(listDirectoryResponse.DirectoryLayout.files ?? [])
+                  setFiles(listDirectoryResponse.DirectoryLayout.files ?? []);
+                  setSelectedIndices(new Set());
                 } else if (listDirectoryResponse.ErrorResponse) {
                   if (currentDirPath) {
                     setTargetDirPath(currentDirPath);
@@ -176,12 +183,22 @@ function FileBrowser(props: FileBrowserProps) {
             </Button>,
             <Button
               key="upload"
+              onClick={() => {
+                setUploading(true);
+              }}
             >
               上传
             </Button>,
             <Button
               key="download"
               disabled={selectedIndices.size === 0}
+              onClick={() => {
+                downloadFiles(props.authToken, files.filter((_, index) => {
+                  return selectedIndices.has(index);
+                }).map((file) => {
+                  return file.path;
+                }))
+              }}
             >
               下载
             </Button>,
@@ -215,6 +232,62 @@ function FileBrowser(props: FileBrowserProps) {
           maskClosable={false}
         >
           正在连接...
+        </Modal>
+        <Modal
+          visible={uploading}
+          closable={isUploadingFiles}
+          maskClosable={isUploadingFiles}
+          footer={null}
+        >
+          <List
+            dataSource={uploadedFiles}
+            renderItem={(uploadedFile) => {
+              return (
+                <List.Item>
+                  {uploadedFile.fileName}
+                </List.Item>
+              );
+            }}
+          />
+          <Input
+            type="file"
+            onChange={(event) => {
+              const selectedFiles = event.target.files;
+              if (selectedFiles) {
+                for (let i = 0; i < selectedFiles.length; i++) {
+                  const file = selectedFiles.item(i);
+                  if (file) {
+                    setUploadedFiles((uploadedFiles) => {
+                      let uploadedFilesCopy = [...uploadedFiles];
+                      uploadedFilesCopy.push({fileName: file.name, content: file})
+                      return uploadedFilesCopy;
+                    })
+                  }
+                }
+              }
+            }}
+            multiple
+          >
+            选择文件以上传
+          </Input>
+          <Button
+            disabled={uploadedFiles.length === 0}
+            onClick={() => {
+              if (currentDirPath) {
+                setIsUploadingFiles(true);
+                uploadFiles(props.authToken, currentDirPath, uploadedFiles)
+                  .then(() => {
+                    setIsUploadingFiles(false);
+                  })
+                  .catch((reason) => {
+                    message.error(reason);
+                    setIsUploadingFiles(false);
+                  })
+              }
+            }}
+          >
+            上传
+          </Button>
         </Modal>
       </div>
     </>
