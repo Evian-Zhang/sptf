@@ -218,6 +218,7 @@ async fn make_directory(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DownloadFilesQuery {
     paths: Vec<String>,
 }
@@ -277,6 +278,7 @@ async fn upload_files(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct WebsocketEstablishRequestQuery {
     auth_token: String,
 }
