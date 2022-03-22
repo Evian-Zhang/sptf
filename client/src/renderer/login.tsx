@@ -14,6 +14,7 @@ const { Item: FormItem } = Form;
 export interface LoginProps {
   setAuthTokenAndToFileBrowser: (authToken: string) => void,
   toSignup: () => void,
+  loginShouldUseCookie: boolean,
 }
 
 enum LoginValidationStatus {
@@ -26,22 +27,24 @@ function Login(props: LoginProps) {
   const [validating, setValidating] = useState(LoginValidationStatus.NoLogin);
   const [loginForm] = Form.useForm();
   useEffect(() => {
-    window.sptfAPI.getCookie()
-      .then((authToken) => {
-        if (authToken) {
-          setValidating(LoginValidationStatus.Validating);
-          loginWithCookie()
-            .then((isSuccess) => {
-              if (isSuccess) {
-                setValidating(LoginValidationStatus.NoLogin);
-                props.setAuthTokenAndToFileBrowser(authToken);
-              } else {
-                setValidating(LoginValidationStatus.Invalid);
-              }
-            })
-        }
-      })
-  }, []);
+    if (props.loginShouldUseCookie) {
+      window.sptfAPI.getCookie()
+        .then((authToken) => {
+          if (authToken) {
+            setValidating(LoginValidationStatus.Validating);
+            loginWithCookie()
+              .then((isSuccess) => {
+                if (isSuccess) {
+                  setValidating(LoginValidationStatus.NoLogin);
+                  props.setAuthTokenAndToFileBrowser(authToken);
+                } else {
+                  setValidating(LoginValidationStatus.Invalid);
+                }
+              })
+          }
+        })
+    }
+  }, [props.loginShouldUseCookie]);
   
   function onFinish() {
     setValidating(LoginValidationStatus.Validating);

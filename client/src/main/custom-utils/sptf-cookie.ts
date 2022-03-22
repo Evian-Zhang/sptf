@@ -28,4 +28,8 @@ async function setCookie(authToken: string) {
     await session.defaultSession.cookies.set(cookie);
 }
 
-export { getCookie, setCookie };
+async function removeCookie() {
+    await session.defaultSession.cookies.remove(DESTINATION_URL, COOKIE_NAME);
+}
+
+export { getCookie, setCookie, removeCookie };

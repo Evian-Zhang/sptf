@@ -123,6 +123,8 @@ function Signup(props: SignupProps) {
         centered
         okText={"确认"}
         cancelButtonProps={{ style: { display: "none" } }}
+        closable={false}
+        maskClosable={false}
       >
         注册成功！
       </Modal>
@@ -132,6 +134,8 @@ function Signup(props: SignupProps) {
         centered
         okText={"确认"}
         cancelButtonProps={{ style: { display: "none" } }}
+        closable={false}
+        maskClosable={false}
       >
         注册失败！
       </Modal>

@@ -14,7 +14,7 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-import { getCookie, setCookie } from './custom-utils/sptf-cookie';
+import { getCookie, setCookie, removeCookie } from './custom-utils/sptf-cookie';
 
 export default class AppUpdater {
   constructor() {
@@ -126,6 +126,7 @@ app
       const result = await setCookie(authToken);
       return result;
     });
+    ipcMain.handle('sptf:removeCookie', removeCookie);
     createWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
