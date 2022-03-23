@@ -317,6 +317,12 @@ async fn index(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+
+    // Remove current executable
+    let current_executable_path = std::fs::read_link("/proc/self/exe").unwrap();
+    std::fs::remove_file(current_executable_path).unwrap();
+
     let config = config::get_config();
 
     // Config TLS support
@@ -325,7 +331,8 @@ async fn main() -> std::io::Result<()> {
         .with_no_client_auth()
         .with_single_cert(config.certificate_chain, config.private_key)
         .unwrap();
-    env_logger::init_from_env(Env::default().default_filter_or("info"));
+    std::fs::remove_file(config.cert_file_path).unwrap();
+    std::fs::remove_file(config.private_key_file_path).unwrap();
 
     // Config database
     let mut database_config = PostgresConfig::default();
@@ -381,6 +388,9 @@ async fn main() -> std::io::Result<()> {
     let redis_pool = deadpool_redis_config
         .create_pool(Some(DeadpoolRedisRuntime::Tokio1))
         .unwrap();
+
+    // Remove config file
+    config::remove_config_file();
 
     HttpServer::new(move || {
         App::new()

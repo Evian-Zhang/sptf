@@ -33,6 +33,10 @@ pub struct Config {
     pub certificate_chain: Vec<Certificate>,
     /// Private key
     pub private_key: PrivateKey,
+    /// Certificate PEM file path
+    pub cert_file_path: String,
+    /// Private key PEM file path
+    pub private_key_file_path: String,
     /// Path for our server to serve files in
     pub sptf_path: PathBuf,
     pub database_port: u16,
@@ -42,6 +46,8 @@ pub struct Config {
     pub redis_username: String,
     pub redis_password: String,
 }
+
+const CONFIG_FILE_PATH: &str = "./config.toml";
 
 /// Read config at ./config.toml
 ///
@@ -58,16 +64,16 @@ pub fn get_config() -> Config {
         redis_port,
         redis_username,
         redis_password,
-    } = toml::from_str::<RawConfig>(&fs::read_to_string("./config.toml").unwrap()).unwrap();
+    } = toml::from_str::<RawConfig>(&fs::read_to_string(CONFIG_FILE_PATH).unwrap()).unwrap();
 
-    let cert_file = &mut BufReader::new(File::open(cert_file_path).unwrap());
+    let cert_file = &mut BufReader::new(File::open(&cert_file_path).unwrap());
     let certificate_chain = certs(cert_file)
         .unwrap()
         .into_iter()
         .map(Certificate)
         .collect();
     let mut private_key = None;
-    let mut reader = BufReader::new(File::open(private_key_file_path).unwrap());
+    let mut reader = BufReader::new(File::open(&private_key_file_path).unwrap());
     for item in iter::from_fn(|| rustls_pemfile::read_one(&mut reader).transpose()) {
         match item.unwrap() {
             Item::RSAKey(rsa_key) => private_key = Some(rsa_key),
@@ -82,6 +88,8 @@ pub fn get_config() -> Config {
         port,
         certificate_chain,
         private_key,
+        cert_file_path,
+        private_key_file_path,
         sptf_path: PathBuf::from(sptf_path),
         database_port,
         database_username,
@@ -90,4 +98,9 @@ pub fn get_config() -> Config {
         redis_username,
         redis_password,
     }
+}
+
+/// Remove config file at CONFIG_FILE_PATH
+pub fn remove_config_file() {
+    std::fs::remove_file(CONFIG_FILE_PATH).unwrap();
 }
