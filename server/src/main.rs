@@ -405,6 +405,7 @@ async fn main() -> std::io::Result<()> {
             .service(login)
             .service(login_with_cookie)
             .service(logout)
+            .service(signup)
             .service(download_files)
             .service(upload_files)
             .service(make_directory)
