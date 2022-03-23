@@ -13,6 +13,20 @@ services:
     ports:
       - target: 5432
         published: ${POSTGRES_HOST_PORT}
+  redis:
+    image: redis
+    volumes:
+      - type: volume
+        source: redis-data
+        target: /data
+      - type: bind
+        source: ./redis.conf
+        target: /usr/local/etc/redis/redis.conf
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - target: 6379
+        published: ${REDIS_HOST_PORT}
 
 volumes:
   db-data:
+  redis-data:
