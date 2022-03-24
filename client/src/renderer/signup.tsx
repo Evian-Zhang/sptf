@@ -7,7 +7,6 @@ import {
   message,
 } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { signup } from './custom-utils/conn';
 
 const { Item: FormItem } = Form;
 
@@ -30,7 +29,7 @@ function Signup(props: SignupProps) {
     setValidationStatus(SignupValidationStatus.Validating);
     const username = signupForm.getFieldValue("username");
     const password = signupForm.getFieldValue("password");
-    signup(username, password)
+    window.sptfAPI.signup(username, password)
       .then(() => {
         setValidationStatus(SignupValidationStatus.Valid);
       })

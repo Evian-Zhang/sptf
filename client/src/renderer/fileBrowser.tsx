@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles, makeDirectory, logout } from './custom-utils/conn';
+import { createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles } from './custom-utils/conn';
 import {
   Button,
   Modal,
@@ -218,7 +218,7 @@ function FileBrowser(props: FileBrowserProps) {
               key="logout"
               disabled={selectedIndices.size === 0}
               onClick={() => {
-                logout().then(() => {
+                window.sptfAPI.logout().then(() => {
                   props.onAuthFailed();
                 })
               }}
@@ -298,7 +298,7 @@ function FileBrowser(props: FileBrowserProps) {
             onClick={() => {
               if (currentDirPath) {
                 setIsUploadingFiles(true);
-                uploadFiles(currentDirPath, uploadedFiles)
+                window.sptfAPI.uploadFiles(currentDirPath, uploadedFiles)
                   .then(() => {
                     setIsUploadingFiles(false);
                     setUploading(false);
@@ -339,7 +339,7 @@ function FileBrowser(props: FileBrowserProps) {
           />
           <Button
             onClick={() => {
-              makeDirectory(newDirectoryName)
+              window.sptfAPI.makeDirectory(newDirectoryName)
                 .then(() => {
                   setIsCreatingDirectory(false);
                   setCreatingDirectory(false);

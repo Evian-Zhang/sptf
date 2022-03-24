@@ -1,7 +1,7 @@
 const {session} = require('electron')
 
 const COOKIE_NAME = "SPTF_AUTH";
-const DESTINATION_URL = "http://evian-workstation.local";
+const DESTINATION_URL = "https://evian-workstation.local:8766";
 
 async function getCookie(): Promise<string | null> {
     try {
