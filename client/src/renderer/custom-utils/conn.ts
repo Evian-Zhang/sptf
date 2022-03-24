@@ -1,18 +1,23 @@
 import { sptf } from './protos';
 import { handleErrorCode, handleNonOkHttpResponse } from './error_handling';
 
-const SERVER_DOMAIN = "https://evian-workstation.local";
+const SERVER_DOMAIN = "https://evian-workstation.local:8766";
 
 /** This method may throw */
 async function login(username: string, password: string): Promise<string> {
-    const rawResponse = await fetch(`${SERVER_DOMAIN}/login`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({username: username, password: password}),
-        mode: "no-cors"
-    });
+    let rawResponse;
+    try {
+        rawResponse = await fetch(`${SERVER_DOMAIN}/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({username: username, password: password}),
+            mode: "no-cors"
+        });
+    } catch {
+        throw "连接失败";
+    }
     if (!rawResponse.ok) {
         await handleNonOkHttpResponse(rawResponse);
     }
@@ -21,11 +26,16 @@ async function login(username: string, password: string): Promise<string> {
 }
 
 async function logout() {
-    const rawResponse = await fetch(`${SERVER_DOMAIN}/logout`, {
-        method: "POST",
-        mode: "no-cors",
-        credentials: "include",
-    });
+    let rawResponse;
+    try {
+        rawResponse = await fetch(`${SERVER_DOMAIN}/logout`, {
+            method: "POST",
+            mode: "no-cors",
+            credentials: "include",
+        });
+    } catch {
+        throw "连接失败";
+    }
     if (!rawResponse.ok) {
         await handleNonOkHttpResponse(rawResponse);
     }
@@ -34,11 +44,16 @@ async function logout() {
 
 /** This method does not throw */
 async function loginWithCookie(): Promise<boolean> {
-    const rawResponse = await fetch(`${SERVER_DOMAIN}/login_with_cookie`, {
-        method: "POST",
-        mode: "no-cors",
-        credentials: "include",
-    });
+    let rawResponse;
+    try {
+        rawResponse = await fetch(`${SERVER_DOMAIN}/login_with_cookie`, {
+            method: "POST",
+            mode: "no-cors",
+            credentials: "include",
+        });
+    } catch {
+        throw "连接失败";
+    }
     if (!rawResponse.ok) {
         await handleNonOkHttpResponse(rawResponse);
     }
@@ -47,14 +62,19 @@ async function loginWithCookie(): Promise<boolean> {
 
 /** This method may throw */
 async function signup(username: string, password: string) {
-    const rawResponse = await fetch(`${SERVER_DOMAIN}/signup`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({username: username, password: password}),
-        mode: "no-cors"
-    });
+    let rawResponse;
+    try {
+        rawResponse = await fetch(`${SERVER_DOMAIN}/signup`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({username: username, password: password}),
+            mode: "no-cors"
+        });
+    } catch {
+        throw "连接失败";
+    }
     if (!rawResponse.ok) {
         await handleNonOkHttpResponse(rawResponse);
     }
@@ -81,7 +101,7 @@ const waitForOpenConnection = (socket: WebSocket) => {
     });
 }
 
-const WEBSOCKET_URL = "wss://evian-workstation.local";
+const WEBSOCKET_URL = "wss://evian-workstation.local:8766";
 
 async function createWebsocket(authToken: string): Promise<WebSocket> {
     let websocket = new WebSocket(`${WEBSOCKET_URL}/ws?authToken=${authToken}`);
@@ -137,12 +157,17 @@ async function uploadFiles(currentDir: string, files: {fileName: string, content
         dirPath: currentDir,
         uploadedFile: uploadedFiles
     });
-    const rawResponse = await fetch(`${SERVER_DOMAIN}/upload`, {
-        method: "POST",
-        body: fileUploadRequest.finish(),
-        mode: "no-cors",
-        credentials: "include",
-    });
+    let rawResponse;
+    try {
+        rawResponse = await fetch(`${SERVER_DOMAIN}/upload`, {
+            method: "POST",
+            body: fileUploadRequest.finish(),
+            mode: "no-cors",
+            credentials: "include",
+        });
+    } catch {
+        throw "连接失败";
+    }
     if (!rawResponse.ok) {
         await handleNonOkHttpResponse(rawResponse);
     }
@@ -150,15 +175,20 @@ async function uploadFiles(currentDir: string, files: {fileName: string, content
 }
 
 async function makeDirectory(directoryPath: string) {
-    const rawResponse = await fetch(`${SERVER_DOMAIN}/make_directory`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({directoryPath: directoryPath}),
-        mode: "no-cors",
-        credentials: "include",
-    });
+    let rawResponse;
+    try {
+        rawResponse = await fetch(`${SERVER_DOMAIN}/make_directory`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({directoryPath: directoryPath}),
+            mode: "no-cors",
+            credentials: "include",
+        });
+    } catch {
+        throw "连接失败";
+    }
     if (!rawResponse.ok) {
         await handleNonOkHttpResponse(rawResponse);
     }
