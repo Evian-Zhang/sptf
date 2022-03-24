@@ -121,7 +121,12 @@ function FileBrowser(props: FileBrowserProps) {
     <>
       <Modal
         visible={websocketConnectStatus === WebsocketConnectStatus.Failure}
-        onOk={props.onWebsocketFailed}
+        onOk={() => {
+          if (websocket) {
+            websocket.close();
+          }
+          props.onWebsocketFailed();
+        }}
         centered
         okText={"确认"}
         cancelButtonProps={{ style: { display: "none" } }}
@@ -219,6 +224,9 @@ function FileBrowser(props: FileBrowserProps) {
               disabled={selectedIndices.size === 0}
               onClick={() => {
                 window.sptfAPI.logout().then(() => {
+                  if (websocket) {
+                    websocket.close();
+                  }
                   props.onAuthFailed();
                 })
               }}
@@ -238,7 +246,12 @@ function FileBrowser(props: FileBrowserProps) {
         </Row>
         <Modal
           visible={closableError !== null}
-          onOk={props.onWebsocketFailed}
+          onOk={() => {
+            if (websocket) {
+              websocket.close();
+            }
+            props.onWebsocketFailed();
+          }}
           centered
           okText={"确认"}
           cancelButtonProps={{ style: { display: "none" } }}
