@@ -8,7 +8,7 @@ declare global {
             loginWithCookie: () => Promise<boolean>,
             logout: () => Promise<void>,
             signup: (username: string, password: string) => Promise<string>,
-            uploadFiles: (currentDir: string, files: {fileName: string, content: Blob}[]) => Promise<void>,
+            uploadFiles: (currentDir: string, files: {fileName: string, path: string}[]) => Promise<void>,
             makeDirectory: (directoryPath: string) => Promise<string>,
         }
     }

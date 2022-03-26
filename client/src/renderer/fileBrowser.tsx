@@ -35,7 +35,7 @@ function FileBrowser(props: FileBrowserProps) {
   const [files, setFiles] = useState<sptf.DirectoryLayout.IFile[]>([]);
   const [selectedIndices, setSelectedIndices] = useState(new Set<number>());
   const [uploading, setUploading] = useState(false); // is file upload modal opened
-  const [uploadedFiles, setUploadedFiles] = useState<{fileName: string, content: Blob}[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{fileName: string, path: string}[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false); // is sending file
   const [creatingDirectory, setCreatingDirectory] = useState(false); // is creating diretcory modal opened
   const [isCreatingDirectory, setIsCreatingDirectory] = useState(false); // is sending creating directory command
@@ -49,9 +49,11 @@ function FileBrowser(props: FileBrowserProps) {
             setWebsocketConnectStatus(WebsocketConnectStatus.Failure);
         };
         websocket.onmessage = (event) => {
+          console.log("Message got");
           const data = event.data;
           handleWebsocketData(data)
             .then((listDirectoryResponse) => {
+              console.log(`Directory path: ${listDirectoryResponse.directoryPath}`)
               if (listDirectoryResponse.directoryPath === targetDirPath) {
                 if (listDirectoryResponse.DirectoryLayout) {
                   setCurrentDirPath(targetDirPath);
@@ -70,6 +72,7 @@ function FileBrowser(props: FileBrowserProps) {
             })
         };
         setWebsocketConnectStatus(WebsocketConnectStatus.Success);
+        requestChangeDir(websocket, targetDirPath);
       })
       .catch(() => {
         setWebsocketConnectStatus(WebsocketConnectStatus.Failure);
@@ -147,7 +150,7 @@ function FileBrowser(props: FileBrowserProps) {
           extra={[
             <Button
               key="goDeeper"
-              disabled={selectedIndices.size !== 1 && isSelectedADir(selectedIndices.values().next().value)}
+              disabled={selectedIndices.size !== 1 || !isSelectedADir(selectedIndices.values().next().value)}
               onClick={() => {
                 if (websocket) {
                   const selectedIndex = selectedIndices.values().next().value;
@@ -294,18 +297,14 @@ function FileBrowser(props: FileBrowserProps) {
                   const file = selectedFiles.item(i);
                   if (file) {
                     setUploadedFiles((uploadedFiles) => {
-                      let uploadedFilesCopy = [...uploadedFiles];
-                      uploadedFilesCopy.push({fileName: file.name, content: file})
-                      return uploadedFilesCopy;
-                    })
+                      return [...uploadedFiles, {fileName: file.name, path: file.path}];
+                    });
                   }
                 }
               }
             }}
             multiple
-          >
-            选择文件以上传
-          </Input>
+          />
           <Button
             disabled={uploadedFiles.length === 0}
             onClick={() => {

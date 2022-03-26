@@ -2,6 +2,7 @@ import { sptf } from '../../renderer/custom-utils/protos';
 import { handleErrorCode } from '../../renderer/custom-utils/error_handling';
 
 const { net, session } = require('electron');
+const { promises: fs } = require('fs');
 
 const SERVER_DOMAIN = "https://evian-workstation.local:8766";
 
@@ -145,12 +146,13 @@ async function signup(username: string, password: string): Promise<void> {
     }));
 }
 
-async function uploadFiles(currentDir: string, files: {fileName: string, content: Blob}[]): Promise<void> {
+async function uploadFiles(currentDir: string, files: {fileName: string, path: string}[]): Promise<void> {
     let uploadedFiles = [];
     for (let file of files) {
-        const dataArray = await new Response(file.content).arrayBuffer();
-        const content = new Uint8Array(dataArray)
-        uploadedFiles.push({fileName: file.fileName, content: content});
+        const data = await fs.readFile(file.path, "utf-8");
+        // const dataArray = await new Response(file.content).arrayBuffer();
+        // const content = new Uint8Array(dataArray)
+        uploadedFiles.push({fileName: file.fileName, content: data});
     }
     const fileUploadRequest = sptf.FileUploadRequest.encode({
         dirPath: currentDir,

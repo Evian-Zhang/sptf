@@ -153,7 +153,7 @@ app
     handleWithCustomErrors('sptf:signup', async (event: any, username: string, password: string) => {
       return signup(username, password);
     })
-    handleWithCustomErrors('sptf:uploadFiles', async (event: any, currentDir: string, files: {fileName: string, content: Blob}[]) => {
+    handleWithCustomErrors('sptf:uploadFiles', async (event: any, currentDir: string, files: {fileName: string, path: string}[]) => {
       return uploadFiles(currentDir, files);
     });
     handleWithCustomErrors('sptf:makeDirectory', async (event: any, directoryPath: string) => {

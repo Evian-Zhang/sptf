@@ -56,7 +56,6 @@ function Login(props: LoginProps) {
         props.setAuthTokenAndToFileBrowser(authToken);
       })
       .catch((reason) => {
-        console.log(Object.getPrototypeOf(reason));
         setValidating(LoginValidationStatus.Invalid);
         message.error(reason);
       });
