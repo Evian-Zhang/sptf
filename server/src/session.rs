@@ -109,7 +109,13 @@ impl Actor for UserSession {
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
-            Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
+            Ok(ws::Message::Ping(msg)) => {
+                self.heartbeat = Instant::now();
+                ctx.pong(&msg);
+            }
+            Ok(ws::Message::Pong(_)) => {
+                self.heartbeat = Instant::now();
+            }
             Ok(ws::Message::Binary(bin)) => {
                 let mut response = BasicOutcomingMessage::default();
                 response.set_version(crate::common::PROTOCOL_VERSION);
@@ -151,6 +157,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
                 use crate::protos::sptf::BasicIncomingMessage_oneof_message_content::*;
                 match message_content {
                     ListDirectoryMessage(list_directory_request) => {
+                        info!(
+                            "Get list directory {} request.",
+                            list_directory_request.get_path()
+                        );
                         let list_directory_response = crate::files::list_dir(
                             &self.root_path,
                             &Path::new(list_directory_request.get_path()),

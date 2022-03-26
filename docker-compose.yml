@@ -22,7 +22,7 @@ services:
       - type: bind
         source: ./redis.conf
         target: /usr/local/etc/redis/redis.conf
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--appendonly", "yes"]
     ports:
       - target: 6379
         published: ${REDIS_HOST_PORT}

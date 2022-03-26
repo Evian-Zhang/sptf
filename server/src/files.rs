@@ -31,13 +31,20 @@ fn user_aware_path(root_path: &Path, real_path: &Path) -> Option<PathBuf> {
         .strip_prefix(root_path)
         .ok()
         .map(Path::to_path_buf)
+        .map(|user_aware_path| {
+            if user_aware_path.as_os_str().is_empty() {
+                PathBuf::from("/")
+            } else {
+                user_aware_path
+            }
+        })
 }
 
 pub fn list_dir(root_path: &Path, user_aware_path: &Path) -> ListDirectoryResponse {
     let real_path = real_path(root_path, user_aware_path);
     let mut list_directory_response = ListDirectoryResponse::default();
 
-    list_directory_response.set_directory_path((*real_path.to_string_lossy()).into());
+    list_directory_response.set_directory_path((*user_aware_path.to_string_lossy()).into());
     match list_dir_internal(&root_path, &real_path) {
         Ok(directory_layout) => {
             list_directory_response.set_DirectoryLayout(directory_layout);
