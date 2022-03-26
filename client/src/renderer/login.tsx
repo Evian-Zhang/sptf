@@ -7,7 +7,6 @@ import {
   message
 } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { login, loginWithCookie } from './custom-utils/conn';
 
 const { Item: FormItem } = Form;
 
@@ -33,7 +32,7 @@ function Login(props: LoginProps) {
           if (authToken) {
             document.cookie = `SPTF_AUTH=${authToken};samesite=none;expires=${new Date(2200, 1).toUTCString}`;
             setValidating(LoginValidationStatus.Validating);
-            loginWithCookie()
+            window.sptfAPI.loginWithCookie()
               .then((isSuccess) => {
                 if (isSuccess) {
                   setValidating(LoginValidationStatus.NoLogin);
@@ -51,12 +50,13 @@ function Login(props: LoginProps) {
     setValidating(LoginValidationStatus.Validating);
     const username = loginForm.getFieldValue("username");
     const password = loginForm.getFieldValue("password");
-    login(username, password)
+    window.sptfAPI.login(username, password)
       .then((authToken) => {
         setValidating(LoginValidationStatus.NoLogin);
         props.setAuthTokenAndToFileBrowser(authToken);
       })
       .catch((reason) => {
+        console.log(Object.getPrototypeOf(reason));
         setValidating(LoginValidationStatus.Invalid);
         message.error(reason);
       });

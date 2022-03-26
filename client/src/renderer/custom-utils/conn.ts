@@ -195,4 +195,5 @@ async function makeDirectory(directoryPath: string) {
     return Promise.resolve();
 }
 
-export { login, loginWithCookie, logout, signup, createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles, makeDirectory };
+export { createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles };
+// export { login, loginWithCookie, logout, signup, createWebsocket, handleWebsocketData, requestChangeDir, downloadFiles, uploadFiles, makeDirectory };

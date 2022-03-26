@@ -15,6 +15,7 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { getCookie, setCookie, removeCookie } from './custom-utils/sptf-cookie';
+import { login, loginWithCookie, logout, signup, uploadFiles, makeDirectory } from './custom-utils/conn';
 
 export default class AppUpdater {
   constructor() {
@@ -118,15 +119,46 @@ app.on('window-all-closed', () => {
   }
 });
 
+
+// see https://github.com/electron/electron/issues/24427
+const encodeError = (e: string) => {
+  return {name: "", message: e, extra: e}
+}
+
+// @ts-ignore
+const handleWithCustomErrors = (channel, handler) => {
+  ipcMain.handle(channel, async (...args) => {
+    try {
+      return {result: await Promise.resolve(handler(...args))}
+    } catch (e) {
+      // @ts-ignore
+      return {error: encodeError(e)}
+    }
+  })
+}
+
 app
   .whenReady()
   .then(() => {
-    ipcMain.handle('sptf:getCookie', getCookie);
-    ipcMain.handle('sptf:setCookie', async (event, authToken: string) => {
-      const result = await setCookie(authToken);
-      return result;
+    handleWithCustomErrors('sptf:getCookie', getCookie);
+    handleWithCustomErrors('sptf:setCookie', async (event: any, authToken: string) => {
+      return setCookie(authToken);
     });
-    ipcMain.handle('sptf:removeCookie', removeCookie);
+    handleWithCustomErrors('sptf:removeCookie', removeCookie);
+    handleWithCustomErrors('sptf:login', async (event: any, username: string, password: string) => {
+      return login(username, password);
+    });
+    handleWithCustomErrors('sptf:loginWithCookie', loginWithCookie);
+    handleWithCustomErrors('sptf:logout', logout);
+    handleWithCustomErrors('sptf:signup', async (event: any, username: string, password: string) => {
+      return signup(username, password);
+    })
+    handleWithCustomErrors('sptf:uploadFiles', async (event: any, currentDir: string, files: {fileName: string, content: Blob}[]) => {
+      return uploadFiles(currentDir, files);
+    });
+    handleWithCustomErrors('sptf:makeDirectory', async (event: any, directoryPath: string) => {
+      return makeDirectory(directoryPath);
+    })
     createWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
