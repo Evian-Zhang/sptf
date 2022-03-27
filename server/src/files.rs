@@ -182,7 +182,7 @@ fn retrieve_timestamp(
 
 pub async fn compress_files(
     root_path: &Path,
-    files: &Vec<String>,
+    files: &Vec<&str>,
 ) -> Result<File, Box<dyn SPTFError>> {
     let temp_dir = match TempDir::new() {
         Ok(temp_dir) => temp_dir,

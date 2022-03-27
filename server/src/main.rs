@@ -220,7 +220,7 @@ async fn make_directory(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DownloadFilesQuery {
-    paths: Vec<String>,
+    paths: String,
 }
 
 #[get("/download")]
@@ -232,7 +232,8 @@ async fn download_files(
     if let Err(err) = validate_cookie(&req, &app_data).await {
         return err.to_http_response();
     }
-    match &query.paths[..] {
+    let paths = query.paths.split(',').collect::<Vec<_>>();
+    match &paths[..] {
         [] => UnexpectedError.to_http_response(),
         [path] => match NamedFile::open(path) {
             Ok(named_file) => named_file.prefer_utf8(true).into_response(&req),
@@ -241,7 +242,7 @@ async fn download_files(
                 FileError::PermissionDenied.to_http_response()
             }
         },
-        _ => match files::compress_files(&app_data.root_path, &query.paths).await {
+        _ => match files::compress_files(&app_data.root_path, &paths).await {
             Ok(compressed_file) => match NamedFile::from_file(compressed_file, "target.tar.gz") {
                 Ok(named_file) => named_file.prefer_utf8(true).into_response(&req),
                 Err(err) => {
