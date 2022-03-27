@@ -224,7 +224,6 @@ function FileBrowser(props: FileBrowserProps) {
             </Button>,
             <Button
               key="logout"
-              disabled={selectedIndices.size === 0}
               onClick={() => {
                 window.sptfAPI.logout().then(() => {
                   if (websocket) {
