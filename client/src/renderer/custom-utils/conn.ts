@@ -137,13 +137,9 @@ function requestChangeDir(websocket: WebSocket, target_dir_path: string) {
     websocket.send(data);
 }
 
-function downloadFiles(authToken: string, filePaths: string[]) {
-    const anchor = document.createElement('a');
-    anchor.href = `${SERVER_DOMAIN}/download?paths=${filePaths.join(',')}`;
-    anchor.download = '';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+async function downloadFiles(authToken: string, filePaths: string[]) {
+    const url = `${SERVER_DOMAIN}/download?paths=${filePaths.join(',')}`;
+    await window.sptfAPI.downloadFiles(url);
 }
 
 async function uploadFiles(currentDir: string, files: {fileName: string, content: Blob}[]) {

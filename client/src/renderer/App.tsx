@@ -27,6 +27,7 @@ const Index = () => {
   const childComponentSetAuthTokenAndToFileBrowser = (authToken: string) => {
     setAuthToken(authToken);
     document.cookie = `SPTF_AUTH=${authToken};samesite=none;expires=${new Date(2200, 1).toUTCString}`;
+    window.sptfAPI.setCookie(authToken);
     setHomepageComponentStatus(HomepageComponentStatus.Filebrowser);
   }
   const onFileBrowserAuthFailed = () => {

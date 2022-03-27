@@ -150,9 +150,7 @@ async function uploadFiles(currentDir: string, files: {fileName: string, path: s
     let uploadedFiles = [];
     for (let file of files) {
         const data = await fs.readFile(file.path, "utf-8");
-        // const dataArray = await new Response(file.content).arrayBuffer();
-        // const content = new Uint8Array(dataArray)
-        uploadedFiles.push({fileName: file.fileName, content: data});
+        uploadedFiles.push({fileName: file.fileName, content: Buffer.from(data)});
     }
     const fileUploadRequest = sptf.FileUploadRequest.encode({
         dirPath: currentDir,

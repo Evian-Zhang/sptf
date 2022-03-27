@@ -10,6 +10,7 @@ declare global {
             signup: (username: string, password: string) => Promise<string>,
             uploadFiles: (currentDir: string, files: {fileName: string, path: string}[]) => Promise<void>,
             makeDirectory: (directoryPath: string) => Promise<string>,
+            downloadFiles: (url: string) => Promise<void>,
         }
     }
 }

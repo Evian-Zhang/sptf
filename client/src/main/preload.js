@@ -22,5 +22,6 @@ contextBridge.exposeInMainWorld('sptfAPI', {
   logout: () => invokeWithCustomErrors('sptf:logout'),
   signup: (username, password) => invokeWithCustomErrors('sptf:signup', username, password),
   uploadFiles: (currentDir, files) => invokeWithCustomErrors('sptf:uploadFiles', currentDir, files),
+  downloadFiles: (url) => ipcRenderer.send('sptf:downloadFiles', url),
   makeDirectory: (directoryPath) => invokeWithCustomErrors('sptf:makeDirectory', directoryPath)
 });

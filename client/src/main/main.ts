@@ -17,6 +17,11 @@ import { resolveHtmlPath } from './util';
 import { getCookie, setCookie, removeCookie } from './custom-utils/sptf-cookie';
 import { login, loginWithCookie, logout, signup, uploadFiles, makeDirectory } from './custom-utils/conn';
 
+const electronDl = require('electron-dl');
+const { download } = require('electron-dl');
+
+electronDl({saveAs: true});
+
 export default class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -158,6 +163,12 @@ app
     });
     handleWithCustomErrors('sptf:makeDirectory', async (event: any, directoryPath: string) => {
       return makeDirectory(directoryPath);
+    })
+    ipcMain.on('sptf:downloadFiles', async (event, url: string) => {
+      const win = BrowserWindow.getFocusedWindow();
+      await download(win, url, {
+        saveAs: true
+      });
     })
     createWindow();
     app.on('activate', () => {
