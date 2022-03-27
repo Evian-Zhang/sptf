@@ -365,7 +365,7 @@ async fn main() -> std::io::Result<()> {
         watcher
             .watch(&root_path, RecursiveMode::Recursive)
             .expect("Unable to setup watcher");
-        FileWatcherActor::new(cloned_manager_address.clone(), rx)
+        FileWatcherActor::new(cloned_manager_address.clone(), rx, watcher)
     });
     filewatcher_addr.do_send(crate::messages::StartWatchingFiles);
     manager_address.do_send(crate::messages::AddFilewatcher {

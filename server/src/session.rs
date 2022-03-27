@@ -170,6 +170,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserSession {
                             warn!("Failed to write to bytes: {}", err);
                             vec![]
                         }));
+                        self.watched_path = Some(PathBuf::from(list_directory_request.get_path()));
                     }
                 }
             }
@@ -187,7 +188,13 @@ impl Handler<RefreshFilesMessage> for UserSession {
         ctx: &mut ws::WebsocketContext<Self>,
     ) -> Self::Result {
         if let Some(watched_path) = &self.watched_path {
-            if msg.file_paths.contains(watched_path) {
+            if msg
+                .file_paths
+                .into_iter()
+                .filter_map(|file_path| file_path.parent().map(Path::to_path_buf))
+                .collect::<Vec<_>>()
+                .contains(&crate::files::real_path(&self.root_path, &watched_path))
+            {
                 // TODO: How to debounce this?
                 let mut response = BasicOutcomingMessage::default();
                 response.set_version(crate::common::PROTOCOL_VERSION);

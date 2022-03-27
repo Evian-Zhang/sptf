@@ -8,16 +8,20 @@ use std::sync::mpsc::Receiver;
 pub struct FileWatcherActor {
     manager_address: Addr<crate::manager::SessionManager>,
     rx: Receiver<DebouncedEvent>,
+    // Use this field to prevent destruting watcher and then make tx die
+    watcher: notify::INotifyWatcher,
 }
 
 impl FileWatcherActor {
     pub fn new(
         manager_address: Addr<crate::manager::SessionManager>,
         rx: Receiver<DebouncedEvent>,
+        watcher: notify::INotifyWatcher,
     ) -> Self {
         Self {
             manager_address,
             rx,
+            watcher,
         }
     }
 }

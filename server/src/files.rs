@@ -14,7 +14,7 @@ use tempfile::TempDir;
 /// Compose root path and user-aware path
 ///
 /// Don't worry about attacker gives something like "../", it is restricted to access
-fn real_path(root_path: &Path, path: &Path) -> PathBuf {
+pub fn real_path(root_path: &Path, path: &Path) -> PathBuf {
     let path = if let Ok(path) = path.strip_prefix("/") {
         path.to_path_buf()
     } else {
