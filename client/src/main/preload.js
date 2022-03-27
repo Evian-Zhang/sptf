@@ -16,7 +16,7 @@ const invokeWithCustomErrors = async (...args) => {
 contextBridge.exposeInMainWorld('sptfAPI', {
   getCookie: () => invokeWithCustomErrors('sptf:getCookie'),
   setCookie: (authToken) => invokeWithCustomErrors('sptf:setCookie', authToken),
-  removeCookies: () => invokeWithCustomErrors('sptf:removeCookies'),
+  removeCookie: () => invokeWithCustomErrors('sptf:removeCookie'),
   login: (username, password) => invokeWithCustomErrors('sptf:login', username, password),
   loginWithCookie: () => invokeWithCustomErrors('sptf:loginWithCookie'),
   logout: () => invokeWithCustomErrors('sptf:logout'),

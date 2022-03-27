@@ -215,7 +215,7 @@ function FileBrowser(props: FileBrowserProps) {
             </Button>,
             <Button
               key="makeDirectory"
-              disabled={selectedIndices.size === 0}
+              disabled={selectedIndices.size !== 0}
               onClick={() => {
                 setCreatingDirectory(true);
               }}
@@ -274,9 +274,12 @@ function FileBrowser(props: FileBrowserProps) {
         </Modal>
         <Modal
           visible={uploading}
-          closable={isUploadingFiles}
-          maskClosable={isUploadingFiles}
+          closable={!isUploadingFiles}
+          maskClosable={!isUploadingFiles}
           footer={null}
+          onCancel={() => {
+            setUploading(false);
+          }}
         >
           <List
             dataSource={uploadedFiles}
@@ -330,8 +333,11 @@ function FileBrowser(props: FileBrowserProps) {
         </Modal>
         <Modal
           visible={creatingDirectory}
-          closable={isCreatingDirectory}
-          maskClosable={isCreatingDirectory}
+          closable={!isCreatingDirectory}
+          maskClosable={!isCreatingDirectory}
+          onCancel={() => {
+            setCreatingDirectory(false);
+          }}
           footer={null}
         >
           <Input

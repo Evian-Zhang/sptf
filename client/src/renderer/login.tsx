@@ -41,6 +41,10 @@ function Login(props: LoginProps) {
                   setValidating(LoginValidationStatus.Invalid);
                 }
               })
+              .catch(() => {
+                setValidating(LoginValidationStatus.NoLogin);
+                window.sptfAPI.removeCookie();
+              })
           }
         })
     }
